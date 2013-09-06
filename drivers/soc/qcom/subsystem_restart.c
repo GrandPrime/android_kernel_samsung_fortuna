@@ -149,6 +149,7 @@ struct restart_log {
  * @do_ramdump_on_put: ramdump on subsystem_put() if true
  * @err_ready: completion variable to record error ready from subsystem
  * @crashed: indicates if subsystem has crashed
+ * @notif_state: current state of subsystem in terms of subsys notifications
  */
 struct subsys_device {
 	struct subsys_desc *desc;
@@ -178,6 +179,7 @@ struct subsys_device {
 	dev_t dev_no;
 	struct completion err_ready;
 	bool crashed;
+	int notif_state;
 	struct list_head list;
 };
 
@@ -424,6 +426,18 @@ static int is_ramdump_enabled(struct subsys_device *dev)
 	return enable_ramdumps;
 }
 
+static void send_sysmon_notif(struct subsys_device *dev)
+{
+	struct subsys_device *subsys;
+
+	mutex_lock(&subsys_list_lock);
+	list_for_each_entry(subsys, &subsys_list, list)
+		if ((subsys->notif_state > 0) && (subsys != dev))
+			sysmon_send_event(dev->desc->name, subsys->desc->name,
+						subsys->notif_state);
+	mutex_unlock(&subsys_list_lock);
+}
+
 static void for_each_subsys_device(struct subsys_device **list, unsigned count,
 		void *data, void (*fn)(struct subsys_device *, void *))
 {
@@ -451,6 +465,8 @@ static void notify_each_subsys_device(struct subsys_device **list,
 
 		pdev = container_of(dev->desc->dev, struct platform_device,
 									dev);
+		dev->notif_state = notif;
+
 		mutex_lock(&subsys_list_lock);
 		list_for_each_entry(subsys, &subsys_list, list)
 			if (dev != subsys &&
@@ -1467,7 +1483,10 @@ struct subsys_device *subsys_register(struct subsys_desc *desc)
 	subsys->dev.bus = &subsys_bus_type;
 	subsys->dev.release = subsys_device_release;
 	subsys->notif_state = -1;
+<<<<<<< HEAD
 	subsys->desc->sysmon_pid = -1;
+=======
+>>>>>>> f373664... msm: subsystem_restart: Send sysmon event notifications on powerup
 
 	subsys->notify = subsys_notif_add_subsys(desc->name);
 
