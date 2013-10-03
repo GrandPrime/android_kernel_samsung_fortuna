@@ -108,7 +108,6 @@ static struct ion_heap_desc ion_heap_meta[] = {
 };
 #endif
 
-<<<<<<< HEAD
 static int msm_ion_lowmem_notifier(struct notifier_block *nb,
 					unsigned long action, void *data)
 {
@@ -120,8 +119,6 @@ static struct notifier_block msm_ion_nb = {
 	.notifier_call = msm_ion_lowmem_notifier,
 };
 
-=======
->>>>>>> 61b82c2... ion: msm: remove superfluous function argument
 struct ion_client *msm_ion_client_create(const char *name)
 {
 	/*
