@@ -44,7 +44,10 @@
 #define TOMTOM_VALIDATE_RX_SBPORT_RANGE(port) ((port >= 16) && (port <= 23))
 #define TOMTOM_CONVERT_RX_SBPORT_ID(port) (port - 16) /* RX1 port ID = 0 */
 
+<<<<<<< HEAD
 #define TOMTOM_MAD_MASTER_SLIM_TX 140
+=======
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 #define TOMTOM_HPH_PA_SETTLE_COMP_ON 3000
 #define TOMTOM_HPH_PA_SETTLE_COMP_OFF 13000
 
@@ -435,9 +438,13 @@ struct tomtom_priv {
 
 	int (*machine_codec_event_cb)(struct snd_soc_codec *codec,
 			enum wcd9xxx_codec_event);
+<<<<<<< HEAD
 	int (*codec_ext_clk_en_cb)(struct snd_soc_codec *codec,
 			int enable, bool dapm);
 	int (*codec_get_ext_clk_cnt) (void);
+=======
+
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 	/*
 	 * list used to save/restore registers at start and
 	 * end of impedance measurement
@@ -2138,7 +2145,11 @@ static int slim_tx_mixer_put(struct snd_kcontrol *kcontrol,
 			if (wcd9xxx_tx_vport_validation(
 					vtable,
 					port_id,
+<<<<<<< HEAD
 					tomtom_p->dai, NUM_CODEC_DAIS)) {
+=======
+					tomtom_p->dai)) {
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 				dev_dbg(codec->dev, "%s: TX%u is used by other virtual port\n",
 					__func__, port_id + 1);
 				mutex_unlock(&codec->mutex);
@@ -2437,6 +2448,7 @@ static int tomtom_codec_enable_adc(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+<<<<<<< HEAD
 /* tomtom_codec_internal_rco_ctrl( )
  * Make sure that BG_CLK_LOCK is not acquired. Exit if acquired to avoid
  * potential deadlock as ext_clk_en_cb() also tries to acquire the same
@@ -2481,6 +2493,8 @@ static int tomtom_codec_internal_rco_ctrl(struct snd_soc_codec *codec,
 	return 0;
 }
 
+=======
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 static int tomtom_codec_enable_aux_pga(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
@@ -2494,10 +2508,15 @@ static int tomtom_codec_enable_aux_pga(struct snd_soc_dapm_widget *w,
 		WCD9XXX_BG_CLK_LOCK(&tomtom->resmgr);
 		wcd9xxx_resmgr_get_bandgap(&tomtom->resmgr,
 					   WCD9XXX_BANDGAP_AUDIO_MODE);
+<<<<<<< HEAD
 		WCD9XXX_BG_CLK_UNLOCK(&tomtom->resmgr);
 		/* AUX PGA requires RCO or MCLK */
 		tomtom_codec_internal_rco_ctrl(codec, true);
 		WCD9XXX_BG_CLK_LOCK(&tomtom->resmgr);
+=======
+		/* AUX PGA requires RCO or MCLK */
+		wcd9xxx_resmgr_get_clk_block(&tomtom->resmgr, WCD9XXX_CLK_RCO);
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 		wcd9xxx_resmgr_enable_rx_bias(&tomtom->resmgr, 1);
 		WCD9XXX_BG_CLK_UNLOCK(&tomtom->resmgr);
 		break;
@@ -2505,11 +2524,17 @@ static int tomtom_codec_enable_aux_pga(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMD:
 		WCD9XXX_BG_CLK_LOCK(&tomtom->resmgr);
 		wcd9xxx_resmgr_enable_rx_bias(&tomtom->resmgr, 0);
+<<<<<<< HEAD
 		WCD9XXX_BG_CLK_UNLOCK(&tomtom->resmgr);
 		tomtom_codec_internal_rco_ctrl(codec, false);
 		WCD9XXX_BG_CLK_LOCK(&tomtom->resmgr);
 		wcd9xxx_resmgr_put_bandgap(&tomtom->resmgr,
 					   WCD9XXX_BANDGAP_AUDIO_MODE);
+=======
+		wcd9xxx_resmgr_put_bandgap(&tomtom->resmgr,
+					   WCD9XXX_BANDGAP_AUDIO_MODE);
+		wcd9xxx_resmgr_put_clk_block(&tomtom->resmgr, WCD9XXX_CLK_RCO);
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 		WCD9XXX_BG_CLK_UNLOCK(&tomtom->resmgr);
 		break;
 	}
@@ -2684,7 +2709,11 @@ static int tomtom_codec_config_mad(struct snd_soc_codec *codec)
 	}
 
 	if (fw->size < sizeof(struct mad_audio_cal)) {
+<<<<<<< HEAD
 		pr_err("%s: incorrect firmware size %zu\n", __func__, fw->size);
+=======
+		pr_err("%s: incorrect firmware size %u\n", __func__, fw->size);
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 		release_firmware(fw);
 		return -ENOMEM;
 	}
@@ -3151,11 +3180,21 @@ static int __tomtom_codec_enable_ldo_h(struct snd_soc_dapm_widget *w,
 			WCD9XXX_BG_CLK_LOCK(&priv->resmgr);
 			wcd9xxx_resmgr_get_bandgap(&priv->resmgr,
 						   WCD9XXX_BANDGAP_AUDIO_MODE);
+<<<<<<< HEAD
 			WCD9XXX_BG_CLK_UNLOCK(&priv->resmgr);
 			tomtom_codec_internal_rco_ctrl(codec, true);
 			snd_soc_update_bits(codec, TOMTOM_A_LDO_H_MODE_1,
 					    1 << 7, 1 << 7);
 			tomtom_codec_internal_rco_ctrl(codec, false);
+=======
+			wcd9xxx_resmgr_get_clk_block(&priv->resmgr,
+						     WCD9XXX_CLK_RCO);
+			snd_soc_update_bits(codec, TOMTOM_A_LDO_H_MODE_1,
+					    1 << 7, 1 << 7);
+			wcd9xxx_resmgr_put_clk_block(&priv->resmgr,
+						     WCD9XXX_CLK_RCO);
+			WCD9XXX_BG_CLK_UNLOCK(&priv->resmgr);
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 			pr_debug("%s: ldo_h_users %d\n", __func__,
 				 priv->ldo_h_users);
 			/* LDO enable requires 1ms to settle down */
@@ -3164,11 +3203,21 @@ static int __tomtom_codec_enable_ldo_h(struct snd_soc_dapm_widget *w,
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		if (--priv->ldo_h_users == 0) {
+<<<<<<< HEAD
 			tomtom_codec_internal_rco_ctrl(codec, true);
 			snd_soc_update_bits(codec, TOMTOM_A_LDO_H_MODE_1,
 					    1 << 7, 0);
 			tomtom_codec_internal_rco_ctrl(codec, false);
 			WCD9XXX_BG_CLK_LOCK(&priv->resmgr);
+=======
+			WCD9XXX_BG_CLK_LOCK(&priv->resmgr);
+			wcd9xxx_resmgr_get_clk_block(&priv->resmgr,
+						     WCD9XXX_CLK_RCO);
+			snd_soc_update_bits(codec, TOMTOM_A_LDO_H_MODE_1,
+					    1 << 7, 0);
+			wcd9xxx_resmgr_put_clk_block(&priv->resmgr,
+						     WCD9XXX_CLK_RCO);
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 			wcd9xxx_resmgr_put_bandgap(&priv->resmgr,
 						   WCD9XXX_BANDGAP_AUDIO_MODE);
 			WCD9XXX_BG_CLK_UNLOCK(&priv->resmgr);
@@ -3231,8 +3280,13 @@ static int tomtom_hphl_dac_event(struct snd_soc_dapm_widget *w,
 		if (!ret)
 			wcd9xxx_clsh_imped_config(codec, impedl);
 		else
+<<<<<<< HEAD
 			dev_dbg(codec->dev, "%s: Failed to get mbhc impedance %d\n",
 						__func__, ret);
+=======
+			dev_err(codec->dev, "Failed to get mbhc impedance %d\n",
+						ret);
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		break;
@@ -3303,7 +3357,11 @@ static int tomtom_codec_enable_anc(struct snd_soc_dapm_widget *w,
 
 		/* First number is the number of register writes */
 		anc_head = (struct wcd9xxx_anc_header *)(fw->data);
+<<<<<<< HEAD
 		anc_ptr = (u32 *)(fw->data +
+=======
+		anc_ptr = (u32 *)((u32)fw->data +
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 				  sizeof(struct wcd9xxx_anc_header));
 		anc_size_remaining = fw->size -
 				     sizeof(struct wcd9xxx_anc_header);
@@ -4503,8 +4561,13 @@ static int tomtom_get_channel_map(struct snd_soc_dai *dai,
 	case AIF2_PB:
 	case AIF3_PB:
 		if (!rx_slot || !rx_num) {
+<<<<<<< HEAD
 			pr_err("%s: Invalid rx_slot %p or rx_num %p\n",
 				 __func__, rx_slot, rx_num);
+=======
+			pr_err("%s: Invalid rx_slot %d or rx_num %d\n",
+				 __func__, (u32) rx_slot, (u32) rx_num);
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 			return -EINVAL;
 		}
 		list_for_each_entry(ch, &tomtom_p->dai[dai->id].wcd9xxx_ch_list,
@@ -4522,8 +4585,13 @@ static int tomtom_get_channel_map(struct snd_soc_dai *dai,
 	case AIF4_VIFEED:
 	case AIF4_MAD_TX:
 		if (!tx_slot || !tx_num) {
+<<<<<<< HEAD
 			pr_err("%s: Invalid tx_slot %p or tx_num %p\n",
 				 __func__, tx_slot, tx_num);
+=======
+			pr_err("%s: Invalid tx_slot %d or tx_num %d\n",
+				 __func__, (u32) tx_slot, (u32) tx_num);
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 			return -EINVAL;
 		}
 		list_for_each_entry(ch, &tomtom_p->dai[dai->id].wcd9xxx_ch_list,
@@ -5273,6 +5341,7 @@ out_vi:
 	return ret;
 }
 
+<<<<<<< HEAD
 static int tomtom_codec_enable_slimtx_mad(struct snd_soc_codec *codec,
 					  int event)
 {
@@ -5318,6 +5387,8 @@ static int tomtom_codec_enable_slimtx_mad(struct snd_soc_codec *codec,
 return ret;
 }
 
+=======
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 static int tomtom_codec_enable_slimtx(struct snd_soc_dapm_widget *w,
 				     struct snd_kcontrol *kcontrol,
 				     int event)
@@ -6611,6 +6682,7 @@ void tomtom_event_register(
 }
 EXPORT_SYMBOL(tomtom_event_register);
 
+<<<<<<< HEAD
 void tomtom_register_ext_clk_cb(
 	int (*codec_ext_clk_en)(struct snd_soc_codec *codec,
 				int enable, bool dapm),
@@ -6623,6 +6695,8 @@ void tomtom_register_ext_clk_cb(
 }
 EXPORT_SYMBOL(tomtom_register_ext_clk_cb);
 
+=======
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 static void tomtom_init_slim_slave_cfg(struct snd_soc_codec *codec)
 {
 	struct tomtom_priv *priv = snd_soc_codec_get_drvdata(codec);
@@ -6839,6 +6913,7 @@ static enum wcd9xxx_cdc_type tomtom_get_cdc_type(void)
 	return WCD9XXX_CDC_TYPE_TOMTOM;
 }
 
+<<<<<<< HEAD
 static bool tomtom_mbhc_ins_rem_status(struct snd_soc_codec *codec)
 {
 	return snd_soc_read(codec, WCD9XXX_A_MBHC_INSERT_DET_STATUS) &
@@ -6861,13 +6936,18 @@ static void tomtom_mbhc_micb_pulldown_ctrl(struct wcd9xxx_mbhc *mbhc,
 	}
 }
 
+=======
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 static const struct wcd9xxx_mbhc_cb mbhc_cb = {
 	.get_cdc_type = tomtom_get_cdc_type,
 	.setup_zdet = tomtom_setup_zdet,
 	.compute_impedance = tomtom_compute_impedance,
+<<<<<<< HEAD
 	.insert_rem_status = tomtom_mbhc_ins_rem_status,
 	.micbias_pulldown_ctrl = tomtom_mbhc_micb_pulldown_ctrl,
 	.codec_rco_ctrl = tomtom_codec_internal_rco_ctrl,
+=======
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 };
 
 static const struct wcd9xxx_mbhc_intr cdc_intr_ids = {
@@ -7020,77 +7100,6 @@ static struct regulator *tomtom_codec_find_regulator(struct snd_soc_codec *cdc,
 	return NULL;
 }
 
-static struct wcd_cpe_core *tomtom_codec_get_cpe_core(
-		struct snd_soc_codec *codec)
-{
-	struct tomtom_priv *priv = snd_soc_codec_get_drvdata(codec);
-	return priv->cpe_core;
-}
-
-static int tomtom_codec_fll_enable(struct snd_soc_codec *codec,
-				   bool enable)
-{
-	if (enable) {
-		snd_soc_update_bits(codec, TOMTOM_A_FLL_KDCO_TUNE,
-				    0x07, 0x05);
-		snd_soc_write(codec, TOMTOM_A_FLL_LOCK_THRESH,
-			      0xC2);
-		snd_soc_write(codec, TOMTOM_A_FLL_LOCK_DET_COUNT,
-			      0x40);
-		snd_soc_update_bits(codec, TOMTOM_A_FLL_TEST_ENABLE,
-				    0x06, 0x06);
-	} else {
-		snd_soc_update_bits(codec, TOMTOM_A_FLL_KDCO_TUNE,
-				    0x80, 0x00);
-	}
-
-	return 0;
-}
-
-static void tomtom_codec_cpe_setup_callbacks(
-		struct wcd_cpe_cdc_cb *cpe_cb,
-		int (*cdc_ext_clk)(struct snd_soc_codec *codec,
-		int enable, bool dapm))
-{
-	cpe_cb->cdc_clk_en = tomtom_codec_internal_rco_ctrl;
-	cpe_cb->cpe_clk_en = tomtom_codec_fll_enable;
-	cpe_cb->slimtx_lab_en = tomtom_codec_enable_slimtx_mad;
-	if (cdc_ext_clk == NULL)
-		pr_err("%s: MCLK could not be set", __func__);
-	cpe_cb->cdc_ext_clk = cdc_ext_clk;
-}
-
-int tomtom_enable_cpe(struct snd_soc_codec *codec)
-{
-	struct tomtom_priv *tomtom = snd_soc_codec_get_drvdata(codec);
-	struct wcd_cpe_params cpe_params;
-	struct wcd_cpe_cdc_cb cpe_cdc_cb;
-
-	tomtom_codec_cpe_setup_callbacks(&cpe_cdc_cb,
-					 tomtom->codec_ext_clk_en_cb);
-	memset(&cpe_params, 0,
-	       sizeof(struct wcd_cpe_params));
-	cpe_params.codec = codec;
-	cpe_params.get_cpe_core = tomtom_codec_get_cpe_core;
-	cpe_params.cdc_cb = &cpe_cdc_cb;
-	cpe_params.dbg_mode = cpe_debug_mode;
-	cpe_params.cdc_major_ver = TOMTOM_CPE_MAJOR_VER;
-	cpe_params.cdc_minor_ver = TOMTOM_CPE_MINOR_VER;
-	cpe_params.cdc_id = TOMTOM_CPE_CDC_ID;
-
-	tomtom->cpe_core = wcd_cpe_init_and_boot("cpe", codec,
-						 &cpe_params);
-	if (IS_ERR_OR_NULL(tomtom->cpe_core)) {
-		dev_err(codec->dev,
-			"%s: Failed to enable CPE\n",
-			__func__);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL(tomtom_enable_cpe);
-
 static int tomtom_codec_probe(struct snd_soc_codec *codec)
 {
 	struct wcd9xxx *control;
@@ -7173,8 +7182,11 @@ static int tomtom_codec_probe(struct snd_soc_codec *codec)
 	else if (wcd9xxx->mclk_rate == TOMTOM_MCLK_CLK_9P6MHZ)
 		snd_soc_update_bits(codec, TOMTOM_A_CHIP_CTL, 0x06, 0x2);
 	tomtom_codec_init_reg(codec);
+<<<<<<< HEAD
 	/* set QFuse for LAB FIFO detection */
 	snd_soc_write(codec, TOMTOM_A_QFUSE_CTL, 0x3);
+=======
+>>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 	ret = tomtom_handle_pdata(tomtom);
 	if (IS_ERR_VALUE(ret)) {
 		pr_err("%s: bad pdata\n", __func__);
