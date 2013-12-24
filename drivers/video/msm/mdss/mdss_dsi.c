@@ -150,10 +150,13 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata, int enable)
 		if (mdss_dsi_pinctrl_set_state(ctrl_pdata, false))
 			pr_debug("reset disable: pinctrl not enabled\n");
 
-		if (ctrl_pdata->panel_extra_power) {
-			ret = ctrl_pdata->panel_extra_power(pdata, enable);
+		for (i = DSI_MAX_PM - 1; i >= 0; i--) {
+			ret = msm_dss_enable_vreg(
+				ctrl_pdata->power_data[i].vreg_config,
+				ctrl_pdata->power_data[i].num_vreg, 0);
 			if (ret)
-				pr_err("%s : failed to enable extra power\n", __func__);
+				pr_err("%s: failed to disable vregs for %s\n",
+					__func__, __mdss_dsi_pm_name(i));
 		}
 
 		for (i = DSI_MAX_PM - 1; i >= 0; i--) {
