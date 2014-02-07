@@ -439,12 +439,18 @@ struct tomtom_priv {
 	int (*machine_codec_event_cb)(struct snd_soc_codec *codec,
 			enum wcd9xxx_codec_event);
 <<<<<<< HEAD
+<<<<<<< HEAD
 	int (*codec_ext_clk_en_cb)(struct snd_soc_codec *codec,
 			int enable, bool dapm);
 	int (*codec_get_ext_clk_cnt) (void);
 =======
 
 >>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
+=======
+	int (*codec_ext_clk_en_cb)(struct snd_soc_codec *codec,
+			int enable, bool dapm);
+	int (*codec_get_ext_clk_cnt) (void);
+>>>>>>> dfc6052... ASoC: wcd9xxx: Update RCO and MCLK sequence for wcd9330
 	/*
 	 * list used to save/restore registers at start and
 	 * end of impedance measurement
@@ -2449,6 +2455,9 @@ static int tomtom_codec_enable_adc(struct snd_soc_dapm_widget *w,
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> dfc6052... ASoC: wcd9xxx: Update RCO and MCLK sequence for wcd9330
 /* tomtom_codec_internal_rco_ctrl( )
  * Make sure that BG_CLK_LOCK is not acquired. Exit if acquired to avoid
  * potential deadlock as ext_clk_en_cb() also tries to acquire the same
@@ -2493,8 +2502,11 @@ static int tomtom_codec_internal_rco_ctrl(struct snd_soc_codec *codec,
 	return 0;
 }
 
+<<<<<<< HEAD
 =======
 >>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
+=======
+>>>>>>> dfc6052... ASoC: wcd9xxx: Update RCO and MCLK sequence for wcd9330
 static int tomtom_codec_enable_aux_pga(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
@@ -2509,6 +2521,7 @@ static int tomtom_codec_enable_aux_pga(struct snd_soc_dapm_widget *w,
 		wcd9xxx_resmgr_get_bandgap(&tomtom->resmgr,
 					   WCD9XXX_BANDGAP_AUDIO_MODE);
 <<<<<<< HEAD
+<<<<<<< HEAD
 		WCD9XXX_BG_CLK_UNLOCK(&tomtom->resmgr);
 		/* AUX PGA requires RCO or MCLK */
 		tomtom_codec_internal_rco_ctrl(codec, true);
@@ -2517,6 +2530,12 @@ static int tomtom_codec_enable_aux_pga(struct snd_soc_dapm_widget *w,
 		/* AUX PGA requires RCO or MCLK */
 		wcd9xxx_resmgr_get_clk_block(&tomtom->resmgr, WCD9XXX_CLK_RCO);
 >>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
+=======
+		WCD9XXX_BG_CLK_UNLOCK(&tomtom->resmgr);
+		/* AUX PGA requires RCO or MCLK */
+		tomtom_codec_internal_rco_ctrl(codec, true);
+		WCD9XXX_BG_CLK_LOCK(&tomtom->resmgr);
+>>>>>>> dfc6052... ASoC: wcd9xxx: Update RCO and MCLK sequence for wcd9330
 		wcd9xxx_resmgr_enable_rx_bias(&tomtom->resmgr, 1);
 		WCD9XXX_BG_CLK_UNLOCK(&tomtom->resmgr);
 		break;
@@ -2524,6 +2543,7 @@ static int tomtom_codec_enable_aux_pga(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMD:
 		WCD9XXX_BG_CLK_LOCK(&tomtom->resmgr);
 		wcd9xxx_resmgr_enable_rx_bias(&tomtom->resmgr, 0);
+<<<<<<< HEAD
 <<<<<<< HEAD
 		WCD9XXX_BG_CLK_UNLOCK(&tomtom->resmgr);
 		tomtom_codec_internal_rco_ctrl(codec, false);
@@ -2535,6 +2555,13 @@ static int tomtom_codec_enable_aux_pga(struct snd_soc_dapm_widget *w,
 					   WCD9XXX_BANDGAP_AUDIO_MODE);
 		wcd9xxx_resmgr_put_clk_block(&tomtom->resmgr, WCD9XXX_CLK_RCO);
 >>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
+=======
+		WCD9XXX_BG_CLK_UNLOCK(&tomtom->resmgr);
+		tomtom_codec_internal_rco_ctrl(codec, false);
+		WCD9XXX_BG_CLK_LOCK(&tomtom->resmgr);
+		wcd9xxx_resmgr_put_bandgap(&tomtom->resmgr,
+					   WCD9XXX_BANDGAP_AUDIO_MODE);
+>>>>>>> dfc6052... ASoC: wcd9xxx: Update RCO and MCLK sequence for wcd9330
 		WCD9XXX_BG_CLK_UNLOCK(&tomtom->resmgr);
 		break;
 	}
@@ -3181,6 +3208,7 @@ static int __tomtom_codec_enable_ldo_h(struct snd_soc_dapm_widget *w,
 			wcd9xxx_resmgr_get_bandgap(&priv->resmgr,
 						   WCD9XXX_BANDGAP_AUDIO_MODE);
 <<<<<<< HEAD
+<<<<<<< HEAD
 			WCD9XXX_BG_CLK_UNLOCK(&priv->resmgr);
 			tomtom_codec_internal_rco_ctrl(codec, true);
 			snd_soc_update_bits(codec, TOMTOM_A_LDO_H_MODE_1,
@@ -3195,6 +3223,13 @@ static int __tomtom_codec_enable_ldo_h(struct snd_soc_dapm_widget *w,
 						     WCD9XXX_CLK_RCO);
 			WCD9XXX_BG_CLK_UNLOCK(&priv->resmgr);
 >>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
+=======
+			WCD9XXX_BG_CLK_UNLOCK(&priv->resmgr);
+			tomtom_codec_internal_rco_ctrl(codec, true);
+			snd_soc_update_bits(codec, TOMTOM_A_LDO_H_MODE_1,
+					    1 << 7, 1 << 7);
+			tomtom_codec_internal_rco_ctrl(codec, false);
+>>>>>>> dfc6052... ASoC: wcd9xxx: Update RCO and MCLK sequence for wcd9330
 			pr_debug("%s: ldo_h_users %d\n", __func__,
 				 priv->ldo_h_users);
 			/* LDO enable requires 1ms to settle down */
@@ -3203,6 +3238,7 @@ static int __tomtom_codec_enable_ldo_h(struct snd_soc_dapm_widget *w,
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		if (--priv->ldo_h_users == 0) {
+<<<<<<< HEAD
 <<<<<<< HEAD
 			tomtom_codec_internal_rco_ctrl(codec, true);
 			snd_soc_update_bits(codec, TOMTOM_A_LDO_H_MODE_1,
@@ -3218,6 +3254,13 @@ static int __tomtom_codec_enable_ldo_h(struct snd_soc_dapm_widget *w,
 			wcd9xxx_resmgr_put_clk_block(&priv->resmgr,
 						     WCD9XXX_CLK_RCO);
 >>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
+=======
+			tomtom_codec_internal_rco_ctrl(codec, true);
+			snd_soc_update_bits(codec, TOMTOM_A_LDO_H_MODE_1,
+					    1 << 7, 0);
+			tomtom_codec_internal_rco_ctrl(codec, false);
+			WCD9XXX_BG_CLK_LOCK(&priv->resmgr);
+>>>>>>> dfc6052... ASoC: wcd9xxx: Update RCO and MCLK sequence for wcd9330
 			wcd9xxx_resmgr_put_bandgap(&priv->resmgr,
 						   WCD9XXX_BANDGAP_AUDIO_MODE);
 			WCD9XXX_BG_CLK_UNLOCK(&priv->resmgr);
@@ -6683,6 +6726,9 @@ void tomtom_event_register(
 EXPORT_SYMBOL(tomtom_event_register);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> dfc6052... ASoC: wcd9xxx: Update RCO and MCLK sequence for wcd9330
 void tomtom_register_ext_clk_cb(
 	int (*codec_ext_clk_en)(struct snd_soc_codec *codec,
 				int enable, bool dapm),
@@ -6695,8 +6741,11 @@ void tomtom_register_ext_clk_cb(
 }
 EXPORT_SYMBOL(tomtom_register_ext_clk_cb);
 
+<<<<<<< HEAD
 =======
 >>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
+=======
+>>>>>>> dfc6052... ASoC: wcd9xxx: Update RCO and MCLK sequence for wcd9330
 static void tomtom_init_slim_slave_cfg(struct snd_soc_codec *codec)
 {
 	struct tomtom_priv *priv = snd_soc_codec_get_drvdata(codec);
@@ -7182,11 +7231,6 @@ static int tomtom_codec_probe(struct snd_soc_codec *codec)
 	else if (wcd9xxx->mclk_rate == TOMTOM_MCLK_CLK_9P6MHZ)
 		snd_soc_update_bits(codec, TOMTOM_A_CHIP_CTL, 0x06, 0x2);
 	tomtom_codec_init_reg(codec);
-<<<<<<< HEAD
-	/* set QFuse for LAB FIFO detection */
-	snd_soc_write(codec, TOMTOM_A_QFUSE_CTL, 0x3);
-=======
->>>>>>> 5927833... ASoC: WCD9330: Add initial driver for WCD9330 codec
 	ret = tomtom_handle_pdata(tomtom);
 	if (IS_ERR_VALUE(ret)) {
 		pr_err("%s: bad pdata\n", __func__);
