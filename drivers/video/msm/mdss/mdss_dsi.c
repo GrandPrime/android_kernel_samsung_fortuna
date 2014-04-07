@@ -1351,15 +1351,8 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	case MDSS_EVENT_ENABLE_PARTIAL_UPDATE:
 		rc = mdss_dsi_ctl_partial_update(pdata);
 		break;
-	case MDSS_EVENT_DSI_DYNAMIC_SWITCH:
-		rc = mdss_dsi_update_panel_config(ctrl_pdata,
-					(int)(unsigned long) arg);
-		break;
-	case MDSS_EVENT_FB_REGISTERED:
-		if (ctrl_pdata->registered) {
-			pr_debug("%s : event=%d, calling panel registered callback\n", __func__, event);
-			rc = ctrl_pdata->registered(pdata);
-		}
+	case MDSS_EVENT_DSI_ULPS_CTRL:
+		rc = mdss_dsi_ulps_config(ctrl_pdata, (int)(unsigned long) arg);
 		break;
 	default:
 		if (ctrl_pdata->event_handler)
