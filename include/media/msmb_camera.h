@@ -17,9 +17,6 @@
 #define MSM_CAM_V4L2_IOCTL_NOTIFY_ERROR \
 	_IOW('V', BASE_VIDIOC_PRIVATE + 33, struct msm_v4l2_event_data)
 
-#define MSM_CAM_V4L2_IOCTL_NOTIFY_MODULE_STATUS \
-	_IOW('V', BASE_VIDIOC_PRIVATE + 34, struct v4l2_event)
-
 #define MSM_CAM_V4L2_IOCTL_NOTIFY_FREEZE \
 	_IOW('V', BASE_VIDIOC_PRIVATE + 34, struct msm_v4l2_event_data)
 
@@ -45,7 +42,6 @@
 #define QCAMERA_VNODE_GROUP_ID	2
 #define MSM_CAMERA_NAME					"msm_camera"
 #define MSM_CONFIGURATION_NAME	"msm_config"
-#define MSM_CAMERA_DUMMY_NAME   "msm_cam_dummy"
 
 #define MSM_CAMERA_SUBDEV_CSIPHY       0
 #define MSM_CAMERA_SUBDEV_CSID         1
