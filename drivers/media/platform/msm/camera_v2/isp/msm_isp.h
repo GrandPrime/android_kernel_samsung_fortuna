@@ -34,7 +34,6 @@
 #define VFE40_8916_VERSION 0x10030000
 #define VFE40_8939_VERSION 0x10040000
 
-#define MAX_IOMMU_CTX 2
 #define MAX_NUM_WM 7
 #define MAX_NUM_RDI 3
 #define MAX_NUM_RDI_MASTER 3
@@ -238,6 +237,8 @@ struct msm_vfe_ops {
 
 struct msm_vfe_hardware_info {
 	int num_iommu_ctx;
+	/* secure iommu ctx nums */
+	int num_iommu_secure_ctx;
 	int vfe_clk_idx;
 	struct msm_vfe_ops vfe_ops;
 	struct msm_vfe_axi_hardware_info *axi_hw_info;
@@ -496,6 +497,8 @@ struct vfe_device {
 	void __iomem *vfe_vbif_base;
 
 	struct device *iommu_ctx[MAX_IOMMU_CTX];
+	/*Add secure context banks*/
+	struct device *iommu_secure_ctx[MAX_IOMMU_CTX];
 
 	struct regulator *fs_vfe;
 	struct clk **vfe_clk;
