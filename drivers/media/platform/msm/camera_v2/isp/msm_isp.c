@@ -286,7 +286,6 @@ static int vfe_probe(struct platform_device *pdev)
 		kfree(vfe_dev);
 		return -EINVAL;
 	}
-
 	/* create secure context banks*/
 	if (vfe_dev->hw_info->num_iommu_secure_ctx) {
 		/*secure vfe layout*/
