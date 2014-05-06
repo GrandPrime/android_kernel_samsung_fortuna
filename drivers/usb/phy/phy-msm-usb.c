@@ -1253,30 +1253,6 @@ phcd_retry:
 		return -EBUSY;
 	}
 
-	/*
-	 * Chipidea 45-nm PHY suspend sequence:
-	 *
-	 * Interrupt Latch Register auto-clear feature is not present
-	 * in all PHY versions. Latch register is clear on read type.
-	 * Clear latch register to avoid spurious wakeup from
-	 * low power mode (LPM).
-	 *
-	 * PHY comparators are disabled when PHY enters into low power
-	 * mode (LPM). Keep PHY comparators ON in LPM only when we expect
-	 * VBUS/Id notifications from USB PHY. Otherwise turn off USB
-	 * PHY comparators. This save significant amount of power.
-	 *
-	 * PLL is not turned off when PHY enters into low power mode (LPM).
-	 * Disable PLL for maximum power savings.
-	 */
-
-	if (motg->pdata->phy_type == CI_45NM_INTEGRATED_PHY) {
-		ulpi_read(phy, 0x14);
-		if (pdata->otg_control == OTG_PHY_CONTROL)
-			ulpi_write(phy, 0x01, 0x30);
-		ulpi_write(phy, 0x08, 0x09);
-	}
-
 	if (motg->caps & ALLOW_VDD_MIN_WITH_RETENTION_DISABLED) {
 		/* put the controller in non-driving mode */
 		func_ctrl = ulpi_read(phy, ULPI_FUNC_CTRL);
@@ -2333,9 +2309,6 @@ static bool msm_chg_aca_detect(struct msm_otg *motg)
 	bool ret = false;
 
 	if (!aca_enabled())
-		goto out;
-
-	if (motg->pdata->phy_type == CI_45NM_INTEGRATED_PHY)
 		goto out;
 
 	int_sts = ulpi_read(phy, 0x87);
@@ -5397,22 +5370,18 @@ static int msm_otg_probe(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "mode debugfs file is"
 			"not available\n");
 
-	if (motg->pdata->phy_type == SNPS_28NM_INTEGRATED_PHY) {
-		if (motg->pdata->otg_control == OTG_PMIC_CONTROL &&
+	if (motg->pdata->otg_control == OTG_PMIC_CONTROL &&
 			(!(motg->pdata->mode == USB_OTG) ||
 			 motg->pdata->pmic_id_irq || motg->ext_id_irq))
-			motg->caps = ALLOW_PHY_POWER_COLLAPSE |
-				ALLOW_PHY_RETENTION;
+		motg->caps = ALLOW_PHY_POWER_COLLAPSE | ALLOW_PHY_RETENTION;
 
-		if (motg->pdata->otg_control == OTG_PHY_CONTROL)
-			motg->caps = ALLOW_PHY_RETENTION |
-				ALLOW_PHY_REGULATORS_LPM;
+	if (motg->pdata->otg_control == OTG_PHY_CONTROL)
+		motg->caps = ALLOW_PHY_RETENTION | ALLOW_PHY_REGULATORS_LPM;
 
-		if (motg->pdata->mpm_dpshv_int || motg->pdata->mpm_dmshv_int)
-			motg->caps |= ALLOW_HOST_PHY_RETENTION;
-			device_create_file(&pdev->dev,
-					&dev_attr_dpdm_pulldown_enable);
-	}
+	if (motg->pdata->mpm_dpshv_int || motg->pdata->mpm_dmshv_int)
+		motg->caps |= ALLOW_HOST_PHY_RETENTION;
+
+	device_create_file(&pdev->dev, &dev_attr_dpdm_pulldown_enable);
 
 	if (motg->pdata->enable_lpm_on_dev_suspend)
 		motg->caps |= ALLOW_LPM_ON_DEV_SUSPEND;
@@ -5594,10 +5563,9 @@ static int msm_otg_remove(struct platform_device *pdev)
 	usb_remove_phy(phy);
 	free_irq(motg->irq, motg);
 
-	if ((motg->pdata->phy_type == SNPS_28NM_INTEGRATED_PHY) &&
-		(motg->pdata->mpm_dpshv_int || motg->pdata->mpm_dmshv_int))
-			device_remove_file(&pdev->dev,
-					&dev_attr_dpdm_pulldown_enable);
+	if (motg->pdata->mpm_dpshv_int || motg->pdata->mpm_dmshv_int)
+		device_remove_file(&pdev->dev,
+				&dev_attr_dpdm_pulldown_enable);
 	if (motg->pdata->otg_control == OTG_PHY_CONTROL &&
 		motg->pdata->mpm_otgsessvld_int)
 		msm_mpm_enable_pin(motg->pdata->mpm_otgsessvld_int, 0);
