@@ -25,6 +25,8 @@
 #include <soc/qcom/spm.h>
 #include "spm_driver.h"
 
+#define VDD_DEFAULT 0xDEADF00D
+
 struct msm_spm_power_modes {
 	uint32_t mode;
 	bool notify_rpm;
@@ -219,6 +221,7 @@ static int msm_spm_dev_init(struct msm_spm_device *dev,
 	int i, ret = -ENOMEM;
 	uint32_t offset = 0;
 
+	dev->cpu_vdd = VDD_DEFAULT;
 	dev->num_modes = data->num_modes;
 	dev->modes = kmalloc(
 			sizeof(struct msm_spm_power_modes) * dev->num_modes,
@@ -259,48 +262,33 @@ spm_failed_malloc:
 
 /**
  * msm_spm_turn_on_cpu_rail(): Power on cpu rail before turning on core
- * @node: The SPM node that controls the voltage for the CPU
+ * @base: The SAW VCTL register which would set the voltage up.
  * @val: The value to be set on the rail
  * @cpu: The cpu for this with rail is being powered on
  */
-int msm_spm_turn_on_cpu_rail(struct device_node *vctl_node,
-		unsigned int val, int cpu, int vctl_offset)
+int msm_spm_turn_on_cpu_rail(void __iomem *base, unsigned int val, int cpu)
 {
 	uint32_t timeout = 2000; /* delay for voltage to settle on the core */
 	struct msm_spm_device *dev = per_cpu(cpu_vctl_device, cpu);
-	void __iomem *base;
 
-	base = of_iomap(vctl_node, 1);
-	if (base) {
-		/*
-		 * Program Q2S to disable SPM legacy mode and ignore Q2S
-		 * channel requests
-		 */
-		writel_relaxed(0x1, base);
-		mb();
-		iounmap(base);
-	}
-
-	base = of_iomap(vctl_node, 0);
-	if (!base)
-		return -ENOMEM;
-
+	/*
+	 * If clock drivers have already set up the voltage,
+	 * do not overwrite that value.
+	 */
 	if (dev && (dev->cpu_vdd != VDD_DEFAULT))
 		return 0;
 
 	/* Set the CPU supply regulator voltage */
 	val = (val & 0xFF);
-	writel_relaxed(val, base + vctl_offset);
+	writel_relaxed(val, base);
 	mb();
 	udelay(timeout);
 
 	/* Enable the CPU supply regulator*/
 	val = 0x30080;
-	writel_relaxed(val, base + vctl_offset);
+	writel_relaxed(val, base);
 	mb();
 	udelay(timeout);
-
-	iounmap(base);
 
 	return 0;
 }
