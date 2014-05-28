@@ -2889,11 +2889,13 @@ static void msm_otg_sm_work(struct work_struct *w)
 			case USB_CHG_STATE_DETECTED:
 				switch (motg->chg_type) {
 				case USB_DCP_CHARGER:
+#if 0
 					if (motg->ext_chg_opened) {
 						init_completion(
 							&motg->ext_chg_wait);
 						motg->ext_chg_active = true;
 					}
+#endif
 					/* fall through */
 				case USB_PROPRIETARY_CHARGER:
 					msm_otg_notify_charger(motg,
