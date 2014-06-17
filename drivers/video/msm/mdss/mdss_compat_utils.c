@@ -23,6 +23,7 @@
 #include "mdss_fb.h"
 #include "mdss_compat_utils.h"
 #include "mdss_mdp_hwio.h"
+#include "mdss_mdp.h"
 
 #define MSMFB_SET_LUT32 _IOW(MSMFB_IOCTL_MAGIC, 131, struct fb_cmap32)
 #define MSMFB_HISTOGRAM32 _IOWR(MSMFB_IOCTL_MAGIC, 132,\
@@ -2346,6 +2347,48 @@ int mdss_compat_overlay_ioctl(struct fb_info *info, unsigned int cmd,
 		} else {
 			ret = mdss_fb_do_ioctl(info, cmd, (unsigned long) ov);
 			ret = __to_user_mdp_overlay(ov32, ov);
+		}
+		break;
+	case MSMFB_OVERLAY_PREPARE:
+		ovlist32 = compat_ptr(arg);
+		if (get_user(num_overlays, &ovlist32->num_overlays)) {
+			pr_err("compat mdp prepare failed: invalid arg\n");
+			return -EFAULT;
+		}
+
+		if (num_overlays >= OVERLAY_MAX) {
+			pr_err("%s: No: of overlays exceeds max\n", __func__);
+			return -EINVAL;
+		}
+
+		layers_sz = num_overlays * sizeof(struct mdp_overlay);
+		prepare_sz = sizeof(struct mdp_overlay_list);
+		layers_refs_sz = num_overlays * sizeof(struct mdp_overlay *);
+
+		total_mem_chunk = compat_alloc_user_space(
+			prepare_sz + layers_refs_sz + layers_sz);
+		if (!total_mem_chunk) {
+			pr_err("%s:%u: compat alloc error [%zu] bytes\n",
+				 __func__, __LINE__,
+				 layers_refs_sz + layers_sz + prepare_sz);
+			return -EINVAL;
+		}
+
+		layers_head = total_mem_chunk + prepare_sz;
+		mdss_compat_align_list(total_mem_chunk, layers_head,
+					num_overlays);
+		ovlist = (struct mdp_overlay_list *)total_mem_chunk;
+
+		ret = __from_user_mdp_overlaylist(ovlist, ovlist32,
+					layers_head);
+		if (ret) {
+			pr_err("compat mdp overlaylist failed\n");
+		} else {
+			ret = mdss_fb_do_ioctl(info, cmd,
+						(unsigned long) ovlist);
+			if (!ret)
+				ret = __to_user_mdp_overlaylist(ovlist32,
+							 ovlist, layers_head);
 		}
 		break;
 	case MSMFB_OVERLAY_UNSET:
