@@ -474,7 +474,7 @@ static void mdm_get_restart_reason(struct work_struct *work)
 	struct device *dev = mdm->dev;
 
 	do {
-		ret = sysmon_get_reason(mdm->sysmon_subsys_id, sfr_buf,
+		ret = sysmon_get_reason(&mdm->esoc->subsys, sfr_buf,
 							sizeof(sfr_buf));
 		if (!ret) {
 			dev_err(dev, "mdm restart reason is %s\n", sfr_buf);

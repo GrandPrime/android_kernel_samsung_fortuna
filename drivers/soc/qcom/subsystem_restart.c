@@ -449,9 +449,8 @@ static void notify_each_subsys_device(struct subsys_device **list,
 		mutex_lock(&subsys_list_lock);
 		list_for_each_entry(subsys, &subsys_list, list)
 			if (dev != subsys)
-				sysmon_send_event(subsys->desc->name,
-						dev->desc->name,
-						notif);
+				sysmon_send_event(subsys->desc, dev->desc,
+								notif);
 		mutex_unlock(&subsys_list_lock);
 
 		notif_data.crashed = subsys_get_crash_status(dev);
