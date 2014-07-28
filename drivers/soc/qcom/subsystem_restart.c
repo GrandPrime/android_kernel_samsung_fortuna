@@ -1505,6 +1505,7 @@ static void subsys_free_irqs(struct subsys_device *subsys)
 struct subsys_device *subsys_register(struct subsys_desc *desc)
 {
 	struct subsys_device *subsys;
+	struct device_node *ofnode = desc->dev->of_node;
 	int ret;
 
 	subsys = kzalloc(sizeof(*subsys), GFP_KERNEL);
@@ -1517,10 +1518,7 @@ struct subsys_device *subsys_register(struct subsys_desc *desc)
 	subsys->dev.bus = &subsys_bus_type;
 	subsys->dev.release = subsys_device_release;
 	subsys->notif_state = -1;
-<<<<<<< HEAD
 	subsys->desc->sysmon_pid = -1;
-=======
->>>>>>> f373664... msm: subsystem_restart: Send sysmon event notifications on powerup
 
 	subsys->notify = subsys_notif_add_subsys(desc->name);
 
@@ -1560,7 +1558,7 @@ struct subsys_device *subsys_register(struct subsys_desc *desc)
 		goto err_register;
 	}
 
-	if (desc->dev->of_node) {
+	if (ofnode) {
 		ret = subsys_parse_devicetree(desc);
 		if (ret)
 			goto err_register;
@@ -1569,16 +1567,14 @@ struct subsys_device *subsys_register(struct subsys_desc *desc)
 
 		ret = subsys_setup_irqs(subsys);
 		if (ret < 0)
-			goto err_register;
+			goto err_setup_irqs;
 
-		if (of_property_read_u32(desc->dev->of_node,
-					"qcom,ssctl-instance-id",
+		if (of_property_read_u32(ofnode, "qcom,ssctl-instance-id",
 					&desc->ssctl_instance_id))
 			pr_debug("Reading instance-id for %s failed\n",
 								desc->name);
 
-		if (of_property_read_u32(desc->dev->of_node,
-					"qcom,sysmon-id",
+		if (of_property_read_u32(ofnode, "qcom,sysmon-id",
 					&subsys->desc->sysmon_pid))
 			pr_debug("Reading sysmon-id for %s failed\n",
 								desc->name);
