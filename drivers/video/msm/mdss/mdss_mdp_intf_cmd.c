@@ -36,8 +36,8 @@ struct mdss_mdp_cmd_ctx {
 	struct completion pp_comp;
 	struct completion stop_comp;
 	struct list_head vsync_handlers;
-	int panel_on;
-	int koff_cnt;
+	int panel_power_state;
+	atomic_t koff_cnt;
 	int clk_enabled;
 	int vsync_enabled;
 	int rdptr_enabled;
@@ -52,6 +52,13 @@ struct mdss_mdp_cmd_ctx {
 };
 
 struct mdss_mdp_cmd_ctx mdss_mdp_cmd_ctx_list[MAX_SESSIONS];
+
+static int mdss_mdp_cmd_do_notifier(struct mdss_mdp_cmd_ctx *ctx);
+
+static bool __mdss_mdp_cmd_panel_power_on(struct mdss_mdp_cmd_ctx *ctx)
+{
+	return (ctx->panel_power_state == MDSS_PANEL_POWER_ON);
+}
 
 static inline u32 mdss_mdp_cmd_line_count(struct mdss_mdp_ctl *ctl)
 {
@@ -193,7 +200,7 @@ static inline void mdss_mdp_cmd_clk_on(struct mdss_mdp_cmd_ctx *ctx)
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 	int rc;
 
-	if (!ctx->panel_on)
+	if (!__mdss_mdp_cmd_panel_power_on(ctx))
 		return;
 
 	mutex_lock(&ctx->clk_mtx);
@@ -580,17 +587,23 @@ int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 		return -ENODEV;
 	}
 
-	mdss_mdp_ctl_perf_set_transaction_status(ctl,
-		PERF_HW_MDP_STATE, PERF_STATUS_BUSY);
+	if (sctl)
+		sctx = (struct mdss_mdp_cmd_ctx *) sctl->priv_data;
 
-	if (ctx->panel_on == 0) {
+	if (!__mdss_mdp_cmd_panel_power_on(ctx)) {
 		rc = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_UNBLANK, NULL);
 		WARN(rc, "intf %d unblank error (%d)\n", ctl->intf_num, rc);
 
-		ctx->panel_on++;
-
 		rc = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_PANEL_ON, NULL);
 		WARN(rc, "intf %d panel on error (%d)\n", ctl->intf_num, rc);
+
+		ctx->panel_power_state = MDSS_PANEL_POWER_ON;
+		if (sctx)
+			sctx->panel_power_state = MDSS_PANEL_POWER_ON;
+
+		mdss_mdp_ctl_intf_event(ctl,
+				MDSS_EVENT_REGISTER_RECOVERY_HANDLER,
+				(void *)&ctx->recovery);
 	}
 
 	MDSS_XLOG(ctl->num, ctl->roi.x, ctl->roi.y, ctl->roi.w,
@@ -624,10 +637,10 @@ int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 	return 0;
 }
 
-int mdss_mdp_cmd_intfs_stop(struct mdss_mdp_ctl *ctl, int session)
+int mdss_mdp_cmd_intfs_stop(struct mdss_mdp_ctl *ctl, int session,
+	int panel_power_state)
 {
 	struct mdss_mdp_cmd_ctx *ctx;
-	struct mdss_panel_info *pinfo;
 	unsigned long flags;
 	int need_wait = 0;
 	int ret = 0;
@@ -636,7 +649,8 @@ int mdss_mdp_cmd_intfs_stop(struct mdss_mdp_ctl *ctl, int session)
 		return 0;
 
 	if (is_split_dst(ctl->mfd)) {
-		ret = mdss_mdp_cmd_intfs_stop(ctl, (session + 1));
+		ret = mdss_mdp_cmd_intfs_stop(ctl, (session + 1),
+			panel_power_state);
 		if (IS_ERR_VALUE(ret))
 			return ret;
 	}
@@ -655,23 +669,15 @@ int mdss_mdp_cmd_intfs_stop(struct mdss_mdp_ctl *ctl, int session)
 	}
 	spin_unlock_irqrestore(&ctx->clk_lock, flags);
 
-	if (need_wait)
-		if (wait_for_completion_timeout(&ctx->stop_comp, STOP_TIMEOUT)
-		    <= 0) {
+	if (need_wait) {
+		hz = mdss_panel_get_framerate(&ctl->panel_data->panel_info);
+		if (wait_for_completion_timeout(&ctx->stop_comp,
+			STOP_TIMEOUT(hz)) <= 0) {
 			WARN(1, "stop cmd time out\n");
-
-			if (IS_ERR_OR_NULL(ctl->panel_data)) {
-				pr_err("no panel data\n");
-			} else {
-				pinfo = &ctl->panel_data->panel_info;
-
-				if (pinfo->panel_dead) {
-					mdss_mdp_irq_disable
-						(MDSS_MDP_IRQ_PING_PONG_RD_PTR,
-								ctx->pp_num);
-					ctx->rdptr_enabled = 0;
-				}
-			}
+			mdss_mdp_irq_disable(MDSS_MDP_IRQ_PING_PONG_RD_PTR,
+				ctx->pp_num);
+			ctx->rdptr_enabled = 0;
+			atomic_set(&ctx->koff_cnt, 0);
 		}
 
 	if (cancel_work_sync(&ctx->clk_work))
@@ -680,10 +686,9 @@ int mdss_mdp_cmd_intfs_stop(struct mdss_mdp_ctl *ctl, int session)
 	if (cancel_delayed_work_sync(&ctx->pc_work))
 		pr_debug("deleted pending power collapse work\n");
 
-	ctx->panel_on = 0;
 	mdss_mdp_cmd_clk_off(ctx);
-
 	flush_work(&ctx->pp_done_work);
+	ctx->panel_power_state = panel_power_state;
 
 	mdss_mdp_set_intr_callback(MDSS_MDP_IRQ_PING_PONG_RD_PTR,
 		ctx->pp_num, NULL, NULL);
@@ -696,7 +701,7 @@ int mdss_mdp_cmd_intfs_stop(struct mdss_mdp_ctl *ctl, int session)
 	return 0;
 }
 
-int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
+int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl, int panel_power_state)
 {
 	struct mdss_mdp_cmd_ctx *ctx;
 	struct mdss_mdp_vsync_handler *tmp, *handle;
@@ -715,17 +720,19 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
 
 	/* Command mode is supported only starting at INTF1 */
 	session = ctl->intf_num - MDSS_MDP_INTF1;
-	ret = mdss_mdp_cmd_intfs_stop(ctl, session);
+	ret = mdss_mdp_cmd_intfs_stop(ctl, session, panel_power_state);
 	if (IS_ERR_VALUE(ret)) {
 		pr_err("unable to stop cmd interface: %d\n", ret);
 		return ret;
 	}
 
 	if (ctl->num == 0) {
-		ret = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_BLANK, NULL);
+		ret = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_BLANK,
+				(void *) (long int) panel_power_state);
 		WARN(ret, "intf %d unblank error (%d)\n", ctl->intf_num, ret);
 
-		ret = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_PANEL_OFF, NULL);
+		ret = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_PANEL_OFF,
+				(void *) (long int) panel_power_state);
 		WARN(ret, "intf %d unblank error (%d)\n", ctl->intf_num, ret);
 	}
 

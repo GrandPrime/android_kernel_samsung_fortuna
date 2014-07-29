@@ -147,7 +147,7 @@ struct mdss_mdp_ctl {
 	char __iomem *base;
 	char __iomem *wb_base;
 	u32 ref_cnt;
-	int power_on;
+	int power_state;
 
 	u32 intf_num;
 	u32 intf_type;
@@ -193,7 +193,7 @@ struct mdss_mdp_ctl {
 	u8 roi_changed;
 
 	int (*start_fnc) (struct mdss_mdp_ctl *ctl);
-	int (*stop_fnc) (struct mdss_mdp_ctl *ctl);
+	int (*stop_fnc) (struct mdss_mdp_ctl *ctl, int panel_power_state);
 	int (*prepare_fnc) (struct mdss_mdp_ctl *ctl, void *arg);
 	int (*display_fnc) (struct mdss_mdp_ctl *ctl, void *arg);
 	int (*wait_fnc) (struct mdss_mdp_ctl *ctl, void *arg);
@@ -571,6 +571,52 @@ static inline int mdss_mdp_panic_signal_supported(
 		pipe->mixer_left->type == MDSS_MDP_MIXER_TYPE_INTF);
 }
 
+static inline struct clk *mdss_mdp_get_clk(u32 clk_idx)
+{
+	if (clk_idx < MDSS_MAX_CLK)
+		return mdss_res->mdp_clk[clk_idx];
+	return NULL;
+}
+
+static inline void mdss_update_sd_client(struct mdss_data_type *mdata,
+							bool status)
+{
+	if (status)
+		atomic_inc(&mdata->sd_client_count);
+	else
+		atomic_add_unless(&mdss_res->sd_client_count, -1, 0);
+}
+
+static inline int mdss_mdp_get_wb_ctl_support(struct mdss_data_type *mdata,
+							bool rotator_session)
+{
+	/*
+	 * Initial control paths are used for primary and external
+	 * interfaces and remaining control paths are used for WB
+	 * interfaces.
+	 */
+	return rotator_session ? (mdata->nctl - mdata->nmixers_wb) :
+				(mdata->nctl - mdata->nwb);
+}
+
+static inline int mdss_mdp_get_pixel_ram_size(struct mdss_data_type *mdata)
+{
+	return (mdata->mdp_rev == MDSS_MDP_HW_REV_107) ?
+						MDSS_MDP_PIXEL_RAM_SIZE : 0;
+}
+
+static inline bool mdss_mdp_is_nrt_vbif_client(struct mdss_data_type *mdata,
+					struct mdss_mdp_pipe *pipe)
+{
+	return mdata->vbif_nrt_io.base && pipe->mixer_left &&
+			pipe->mixer_left->rotator_mode;
+}
+
+static inline bool mdss_mdp_ctl_is_power_on(struct mdss_mdp_ctl *ctl)
+{
+	return (ctl->power_state != MDSS_PANEL_POWER_OFF);
+}
+
 irqreturn_t mdss_mdp_isr(int irq, void *ptr);
 int mdss_iommu_attach(struct mdss_data_type *mdata);
 int mdss_iommu_dettach(struct mdss_data_type *mdata);
@@ -633,7 +679,7 @@ int mdss_mdp_ctl_split_display_setup(struct mdss_mdp_ctl *ctl,
 		struct mdss_panel_data *pdata);
 int mdss_mdp_ctl_destroy(struct mdss_mdp_ctl *ctl);
 int mdss_mdp_ctl_start(struct mdss_mdp_ctl *ctl, bool handoff);
-int mdss_mdp_ctl_stop(struct mdss_mdp_ctl *ctl);
+int mdss_mdp_ctl_stop(struct mdss_mdp_ctl *ctl, int panel_power_mode);
 int mdss_mdp_ctl_intf_event(struct mdss_mdp_ctl *ctl, int event, void *arg);
 int mdss_mdp_perf_bw_check(struct mdss_mdp_ctl *ctl,
 		struct mdss_mdp_pipe **left_plist, int left_cnt,
