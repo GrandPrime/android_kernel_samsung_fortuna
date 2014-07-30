@@ -6351,17 +6351,6 @@ static int tomtom_codec_ear_dac_event(struct snd_soc_dapm_widget *w,
 						 WCD9XXX_CLSH_STATE_EAR,
 						 WCD9XXX_CLSH_REQ_ENABLE,
 						 WCD9XXX_CLSH_EVENT_PRE_DAC);
-		snd_soc_update_bits(codec, w->reg, 0x20, 0x20);
-		break;
-	case SND_SOC_DAPM_POST_PMD:
-		snd_soc_update_bits(codec, w->reg, 0x20, 0x00);
-		wcd9xxx_clsh_fsm(codec, &tomtom_p->clsh_d,
-						 WCD9XXX_CLSH_STATE_EAR,
-						 WCD9XXX_CLSH_REQ_DISABLE,
-						 WCD9XXX_CLSH_EVENT_POST_PA);
-		usleep_range(5000, 5100);
-		break;
-	default:
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		wcd9xxx_clsh_fsm(codec, &tomtom_p->clsh_d,
