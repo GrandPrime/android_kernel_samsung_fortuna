@@ -220,7 +220,13 @@ static int mdss_dsi_panel_power_ctrl(struct mdss_panel_data *pdata,
 		ret = mdss_dsi_panel_power_off(pdata);
 		break;
 	case MDSS_PANEL_POWER_ON:
-		ret = mdss_dsi_panel_power_on(pdata);
+		if (mdss_dsi_is_panel_on_lp(pdata))
+			ret = mdss_dsi_panel_power_doze(pdata, false);
+		else
+			ret = mdss_dsi_panel_power_on(pdata);
+		break;
+	case MDSS_PANEL_POWER_DOZE:
+		ret = mdss_dsi_panel_power_doze(pdata, true);
 		break;
 	default:
 		pr_err("%s: unknown panel power state requested (%d)\n",
@@ -803,8 +809,8 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 
 	pinfo = &pdata->panel_info;
 	mipi = &pdata->panel_info.mipi;
-	
-	if (MDSS_PANEL_POWER_ON == pinfo->panel_power_state) {
+
+	if (mdss_dsi_is_panel_on_interactive(pdata)) {
 		pr_debug("%s: panel already on\n", __func__);
 		goto end;
 	}
