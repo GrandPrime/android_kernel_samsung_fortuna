@@ -184,21 +184,41 @@ out_acc:
 
 static int __init msm_cpu_init(struct device_node *dn, unsigned int cpu)
 {
-	/* Mark CPU0 cold boot flag as done */
-	if (!cpu && !per_cpu(cold_boot_done, cpu))
-		per_cpu(cold_boot_done, cpu) = true;
-
 	return 0;
 }
 
 static int __init msm_cpu_prepare(unsigned int cpu)
 {
+	u64 mpidr_el1 = cpu_logical_map(cpu);
 
-	if (scm_set_boot_addr(virt_to_phys(secondary_holding_pen),
-				cold_boot_flags[cpu])) {
-		pr_warn("Failed to set CPU %u boot address\n", cpu);
-		return -ENOSYS;
+	if (scm_is_mc_boot_available()) {
+
+		if (mpidr_el1 & ~MPIDR_HWID_BITMASK) {
+			pr_err("CPU%d:Failed to set boot address\n", cpu);
+			return -ENOSYS;
+		}
+
+		if (scm_set_boot_addr_mc(virt_to_phys(secondary_holding_pen),
+				BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 0)),
+				BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 1)),
+				BIT(MPIDR_AFFINITY_LEVEL(mpidr_el1, 2)),
+				SCM_FLAG_COLDBOOT_MC)) {
+			pr_warn("CPU%d:Failed to set boot address\n", cpu);
+			return -ENOSYS;
+		}
+
+	} else {
+		if (scm_set_boot_addr(virt_to_phys(secondary_holding_pen),
+			cold_boot_flags[cpu])) {
+			pr_warn("Failed to set CPU %u boot address\n", cpu);
+			return -ENOSYS;
+		}
 	}
+
+	/* Mark CPU0 cold boot flag as done */
+	if (per_cpu(cold_boot_done, 0) == false)
+		per_cpu(cold_boot_done, 0) = true;
+
 	return 0;
 }
 
