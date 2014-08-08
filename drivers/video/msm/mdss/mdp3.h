@@ -66,12 +66,6 @@ enum {
 	MDP3_CLIENT_MAX,
 };
 
-enum {
-	DI_PARTITION_NUM = 0,
-	DI_DOMAIN_NUM = 1,
-	DI_MAX,
-};
-
 struct mdp3_bus_handle_map {
 	struct msm_bus_vectors *bus_vector;
 	struct msm_bus_paths *usecases;
