@@ -113,6 +113,51 @@ static int power_on_l2_msm8916(struct device_node *l2ccc_node, u32 pon_mask)
 
 static int power_on_l2_msm8994(struct device_node *l2ccc_node, u32 pon_mask)
 {
+	struct resource res;
+	int val, ret = 0;
+	void __iomem *l2spm_base = of_iomap(vctl_node, 0);
+
+	if (!l2spm_base)
+		return -ENOMEM;
+
+	if (!(__raw_readl(l2spm_base + L2_SPM_STS) & 0xFFFF0000))
+		goto bail_l2_pwr_bit;
+
+	ret = of_address_to_resource(l2ccc_node, 1, &res);
+	if (ret)
+		goto bail_l2_pwr_bit;
+
+	/* L2 is executing sleep state machine,
+	 * let's softly kick it awake
+	 */
+	val = scm_io_read((u32)res.start);
+	val |= BIT(0);
+	scm_io_write((u32)res.start, val);
+
+	/* Wait until the SPM status indicates that the PWR_CTL
+	 * bits are clear.
+	 */
+	while (readl_relaxed(l2spm_base + L2_SPM_STS) & 0xFFFF0000) {
+		int timeout = 10;
+
+		BUG_ON(!timeout--);
+		cpu_relax();
+		usleep(100);
+	}
+
+	val = scm_io_read((u32)res.start);
+	val &= ~BIT(0);
+	scm_io_write((u32)res.start, val);
+
+bail_l2_pwr_bit:
+	iounmap(l2spm_base);
+	return ret;
+}
+
+static int power_on_l2_msm8994(struct device_node *l2ccc_node, u32 pon_mask,
+				int cpu)
+>>>>>>> 68d406c... soc: qcom: scm: Add APIs to allow register access via the secure world
+{
 	u32 pon_status;
 	void __iomem *l2_base;
 
