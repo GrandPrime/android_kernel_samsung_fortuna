@@ -126,17 +126,6 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 		return;
 	}
 
-	if (ctl->power_state == MDSS_PANEL_POWER_OFF) {
-		schedule_delayed_work(&pstatus_data->check_status,
-			msecs_to_jiffies(interval));
-		pr_debug("%s: ctl not powered on\n", __func__);
-		return;
-	}
-
-	if (ctrl_pdata->status_mode == ESD_TE) {
-		mdss_check_te_status(ctrl_pdata, pstatus_data, interval);
-		return;
-	}
 	if (ctrl_pdata->status_mode == ESD_TE) {
 		mdss_check_te_status(ctrl_pdata, pstatus_data, interval);
 		return;
@@ -147,7 +136,7 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 	 * TODO: Because mdss_dsi_cmd_mdp_busy has made sure DMA to
 	 * be idle in mdss_dsi_cmdlist_commit, it is not necessary
 	 * to acquire ov_lock in case of video mode. Removing this
-	 * lock to fix issues so that ESD thread could block other
+	 * lock to fix issues so that ESD thread would not block other
 	 * overlay operations. Need refine this lock for command mode
 	 */
 
