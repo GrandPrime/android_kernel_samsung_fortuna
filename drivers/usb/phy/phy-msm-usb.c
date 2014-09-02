@@ -129,6 +129,7 @@ static u32 bus_freqs[USB_NUM_BUS_CLOCKS];	/* bimc, snoc, pcnoc clk */;
 static char bus_clkname[USB_NUM_BUS_CLOCKS][20] = {"bimc_clk", "snoc_clk",
 						"pcnoc_clk"};
 static bool bus_clk_rate_set;
+
 #ifdef CONFIG_USB_NOTIFY_LAYER
 #include "phy-msm-usb_sec.c"
 #endif
