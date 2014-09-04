@@ -448,10 +448,15 @@ static void notify_each_subsys_device(struct subsys_device **list,
 									dev);
 		mutex_lock(&subsys_list_lock);
 		list_for_each_entry(subsys, &subsys_list, list)
-			if (dev != subsys)
+			if (dev != subsys &&
+				subsys->track.state == SUBSYS_ONLINE)
 				sysmon_send_event(subsys->desc, dev->desc,
 								notif);
 		mutex_unlock(&subsys_list_lock);
+
+		if (notif == SUBSYS_AFTER_POWERUP &&
+				dev->track.state == SUBSYS_ONLINE)
+			send_sysmon_notif(dev);
 
 		notif_data.crashed = subsys_get_crash_status(dev);
 		notif_data.enable_ramdump = is_ramdump_enabled(dev);
