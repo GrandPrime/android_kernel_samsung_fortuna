@@ -88,6 +88,7 @@ struct ion_cma_secure_heap {
 	struct shrinker shrinker;
 	atomic_t total_allocated;
 	atomic_t total_pool_size;
+	atomic_t total_leaked;
 	unsigned long heap_size;
 	unsigned long default_prefetch_size;
 };
@@ -575,7 +576,6 @@ static void ion_secure_cma_free(struct ion_buffer *buffer)
 	__ion_secure_cma_free(sheap, info, ret ? false : true);
 }
 
-
 static int ion_secure_cma_phys(struct ion_heap *heap, struct ion_buffer *buffer,
 			ion_phys_addr_t *addr, size_t *len)
 {
@@ -660,6 +660,9 @@ static int ion_secure_cma_print_debug(struct ion_heap *heap, struct seq_file *s,
 				atomic_read(&sheap->total_allocated));
 	seq_printf(s, "Total pool size: 0x%x\n",
 				atomic_read(&sheap->total_pool_size));
+	seq_printf(s, "Total memory leaked due to unlock failures: 0x%x\n",
+				atomic_read(&sheap->total_leaked));
+
 	return 0;
 }
 
