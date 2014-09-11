@@ -516,11 +516,15 @@ static int ion_secure_cma_allocate(struct ion_heap *heap,
 		int ret;
 
 		if (!msm_secure_v2_is_supported()) {
-			pr_debug("%s: securing buffers is not supported on this platform\n",
+			pr_err("%s: securing buffers from clients is not supported on this platform\n",
 				__func__);
 			ret = 1;
 		} else {
-			ret = msm_ion_secure_table(buf->table, 0, 0);
+			trace_ion_cp_secure_buffer_start(heap->name, len, align,
+									flags);
+			ret = msm_ion_secure_table(buf->table);
+			trace_ion_cp_secure_buffer_end(heap->name, len, align,
+									flags);
 		}
 		if (ret) {
 			/*
