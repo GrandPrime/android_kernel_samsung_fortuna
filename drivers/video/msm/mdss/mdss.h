@@ -249,6 +249,24 @@ int mdss_iommu_ctrl(int enable);
 int mdss_bus_scale_set_quota(int client, u64 ab_quota_rt, u64 ab_quota_nrt,
 		u64 ib_quota);
 
+struct mdss_util_intf {
+	bool mdp_probe_done;
+	int (*register_irq)(struct mdss_hw *hw);
+	void (*enable_irq)(struct mdss_hw *hw);
+	void (*disable_irq)(struct mdss_hw *hw);
+	void (*disable_irq_nosync)(struct mdss_hw *hw);
+	int (*irq_dispatch)(u32 hw_ndx, int irq, void *ptr);
+	int (*get_iommu_domain)(u32 type);
+	int (*iommu_attached)(void);
+	int (*iommu_ctrl)(int enable);
+	void (*bus_bandwidth_ctrl)(int enable);
+	int (*bus_scale_set_quota)(int client, u64 ab_quota,
+					u64 ab_quote_nrt, u64 ib_quota);
+	struct mdss_panel_cfg* (*panel_intf_type)(int intf_val);
+};
+
+struct mdss_util_intf *mdss_get_util_intf(void);
+
 static inline struct ion_client *mdss_get_ionclient(void)
 {
 	if (!mdss_res)

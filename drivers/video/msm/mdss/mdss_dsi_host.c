@@ -1114,10 +1114,10 @@ static int mdss_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 	size = ALIGN(tp->len, SZ_4K);
 
 
-	if (is_mdss_iommu_attached()) {
-		ret = msm_iommu_map_contig_buffer(tp->dmap,
-					mdss_get_iommu_domain(domain), 0,
-					size, SZ_4K, 0, &(addr));
+	if (ctrl->mdss_util->iommu_attached()) {
+		int ret = msm_iommu_map_contig_buffer(tp->dmap,
+				ctrl->mdss_util->get_iommu_domain(domain), 0,
+				ctrl->dma_size, SZ_4K, 0, &(ctrl->dma_addr));
 		if (IS_ERR_VALUE(ret)) {
 			pr_err("unable to map dma memory to iommu(%d)\n", ret);
 			return -ENOMEM;
@@ -1158,9 +1158,27 @@ static int mdss_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 	else
 		ret = tp->len;
 
+<<<<<<< HEAD
 	if (is_mdss_iommu_attached())
 		msm_iommu_unmap_contig_buffer(addr,
 			mdss_get_iommu_domain(domain), 0, size);
+=======
+	if (mctrl && mctrl->dma_addr) {
+		if (ctrl->mdss_util->iommu_attached()) {
+			msm_iommu_unmap_contig_buffer(mctrl->dma_addr,
+			ctrl->mdss_util->get_iommu_domain(domain),
+							0, mctrl->dma_size);
+		}
+		mctrl->dma_addr = 0;
+		mctrl->dma_size = 0;
+	}
+
+	if (ctrl->mdss_util->iommu_attached()) {
+		msm_iommu_unmap_contig_buffer(ctrl->dma_addr,
+			ctrl->mdss_util->get_iommu_domain(domain),
+							0, ctrl->dma_size);
+	}
+>>>>>>> 93fde65... msm: mdss: Add get pan cfg and get iommu dom to common interface
 
 	return ret;
 }
