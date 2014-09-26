@@ -570,17 +570,18 @@ static void mdp3_clk_remove(void)
 	if (!IS_ERR_OR_NULL(mdp3_res->clocks[MDP3_CLK_AHB]))
 		clk_put(mdp3_res->clocks[MDP3_CLK_AHB]);
 
-	if (!IS_ERR_OR_NULL(mdp3_res->clocks[MDP3_CLK_CORE]))
-		clk_put(mdp3_res->clocks[MDP3_CLK_CORE]);
+	if (!IS_ERR_OR_NULL(mdp3_res->clocks[MDP3_CLK_AXI]))
+		clk_put(mdp3_res->clocks[MDP3_CLK_AXI]);
+
+	if (!IS_ERR_OR_NULL(mdp3_res->clocks[MDP3_CLK_MDP_SRC]))
+		clk_put(mdp3_res->clocks[MDP3_CLK_MDP_SRC]);
+
+	if (!IS_ERR_OR_NULL(mdp3_res->clocks[MDP3_CLK_MDP_CORE]))
+		clk_put(mdp3_res->clocks[MDP3_CLK_MDP_CORE]);
 
 	if (!IS_ERR_OR_NULL(mdp3_res->clocks[MDP3_CLK_VSYNC]))
 		clk_put(mdp3_res->clocks[MDP3_CLK_VSYNC]);
 
-	if (!IS_ERR_OR_NULL(mdp3_res->clocks[MDP3_CLK_LCDC]))
-		clk_put(mdp3_res->clocks[MDP3_CLK_LCDC]);
-
-	if (!IS_ERR_OR_NULL(mdp3_res->clocks[MDP3_CLK_DSI]))
-		clk_put(mdp3_res->clocks[MDP3_CLK_DSI]);
 }
 
 int mdp3_clk_enable(int enable, int dsi_clk)
@@ -591,10 +592,10 @@ int mdp3_clk_enable(int enable, int dsi_clk)
 
 	mutex_lock(&mdp3_res->res_mutex);
 	rc = mdp3_clk_update(MDP3_CLK_AHB, enable);
-	rc |= mdp3_clk_update(MDP3_CLK_CORE, enable);
+	rc |= mdp3_clk_update(MDP3_CLK_AXI, enable);
+	rc |= mdp3_clk_update(MDP3_CLK_MDP_SRC, enable);
+	rc |= mdp3_clk_update(MDP3_CLK_MDP_CORE, enable);
 	rc |= mdp3_clk_update(MDP3_CLK_VSYNC, enable);
-	if (dsi_clk)
-		rc |= mdp3_clk_update(MDP3_CLK_DSI, enable);
 	mutex_unlock(&mdp3_res->res_mutex);
 	return rc;
 }
