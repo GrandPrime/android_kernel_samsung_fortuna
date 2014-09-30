@@ -279,7 +279,7 @@ static int flush_clk_data(struct device *node_device, int ctx)
 	}
 exit_flush_clk_data:
 	/* Reset the aggregated clock rate for fab devices*/
-	if (node->node_info->is_fab_dev)
+	if (node && node->node_info->is_fab_dev)
 		node->cur_clk_hz[ctx] = 0;
 
 	nodeclk->dirty = 0;
