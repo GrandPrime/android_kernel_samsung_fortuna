@@ -19,6 +19,7 @@
 #include <mach/scm-io.h>
 #include <linux/irqreturn.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/gpio.h>
 
 #include "mdss_panel.h"
 #include "mdss_dsi_cmd.h"
@@ -95,6 +96,7 @@ enum dsi_panel_status_mode {
 	ESD_BTA,
 	ESD_REG,
 	ESD_REG_NT35596,
+	ESD_TE,
 	ESD_MAX,
 };
 
@@ -332,6 +334,7 @@ struct mdss_dsi_ctrl_pdata {
 	u8 ctrl_state;
 	int panel_mode;
 	int irq_cnt;
+	int disp_te_gpio;
 	int rst_gpio;
 	int disp_en_gpio;
 	int panel_extra_power_gpio[MAX_EXTRA_POWER_GPIO];
@@ -344,6 +347,14 @@ struct mdss_dsi_ctrl_pdata {
 	int bklt_max;
 	int new_fps;
 	int pwm_enabled;
+	bool panel_bias_vreg;
+	bool dsi_irq_line;
+	atomic_t te_irq_ready;
+
+	bool cmd_sync_wait_broadcast;
+	bool cmd_sync_wait_trigger;
+
+	struct mdss_rect roi;
 	struct pwm_device *pwm_bl;
 	struct dsi_drv_cm_data shared_pdata;
 	u32 pclk_rate;
@@ -418,6 +429,7 @@ void mdss_dsi_controller_cfg(int enable,
 void mdss_dsi_sw_reset(struct mdss_panel_data *pdata);
 
 irqreturn_t mdss_dsi_isr(int irq, void *ptr);
+irqreturn_t hw_vsync_handler(int irq, void *data);
 void mdss_dsi_irq_handler_config(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 
 void mdss_dsi_set_tx_power_mode(int mode, struct mdss_panel_data *pdata);
@@ -534,6 +546,51 @@ static inline struct mdss_dsi_ctrl_pdata *mdss_dsi_get_ctrl_by_index(int ndx)
 		return NULL;
 
 	return ctrl_list[ndx];
+}
+
+static inline bool mdss_dsi_is_ctrl_clk_slave(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	return mdss_dsi_split_display_enabled() &&
+		(ctrl->ndx == DSI_CTRL_CLK_SLAVE);
+}
+
+static inline bool mdss_dsi_is_te_based_esd(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	return (ctrl->status_mode == ESD_TE) &&
+		gpio_is_valid(ctrl->disp_te_gpio) &&
+		mdss_dsi_is_left_ctrl(ctrl);
+}
+
+static inline struct mdss_dsi_ctrl_pdata *mdss_dsi_get_ctrl_clk_master(void)
+{
+	return ctrl_list[DSI_CTRL_CLK_MASTER];
+}
+
+static inline struct mdss_dsi_ctrl_pdata *mdss_dsi_get_ctrl_clk_slave(void)
+{
+	return ctrl_list[DSI_CTRL_CLK_SLAVE];
+}
+
+static inline bool mdss_dsi_is_panel_off(struct mdss_panel_data *pdata)
+{
+	return mdss_panel_is_power_off(pdata->panel_info.panel_power_state);
+}
+
+static inline bool mdss_dsi_is_panel_on(struct mdss_panel_data *pdata)
+{
+	return mdss_panel_is_power_on(pdata->panel_info.panel_power_state);
+}
+
+static inline bool mdss_dsi_is_panel_on_interactive(
+	struct mdss_panel_data *pdata)
+{
+	return mdss_panel_is_power_on_interactive(
+		pdata->panel_info.panel_power_state);
+}
+
+static inline bool mdss_dsi_is_panel_on_lp(struct mdss_panel_data *pdata)
+{
+	return mdss_panel_is_power_on_lp(pdata->panel_info.panel_power_state);
 }
 
 static inline bool mdss_dsi_ulps_feature_enabled(
