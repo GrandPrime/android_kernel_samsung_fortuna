@@ -16,6 +16,7 @@
 #include <linux/slab.h>
 #include <linux/elf.h>
 #include <linux/wait.h>
+#include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
 #include <sound/soc.h>
@@ -32,6 +33,8 @@
 #define CMI_CMD_TIMEOUT (10 * HZ)
 #define WCD_CPE_LSM_MAX_SESSIONS 1
 #define WCD_CPE_AFE_MAX_PORTS 1
+#define WCD_CPE_DRAM_SIZE 0x30000
+#define WCD_CPE_DRAM_OFFSET 0x50000
 
 #define ELF_FLAG_EXECUTE (1 << 0)
 #define ELF_FLAG_WRITE (1 << 1)
@@ -80,6 +83,69 @@ static struct cpe_lsm_session
 		*lsm_sessions[WCD_CPE_LSM_MAX_SESSIONS + 1];
 struct wcd_cpe_core * (*wcd_get_cpe_core) (struct snd_soc_codec *);
 static struct wcd_cmi_afe_port_data afe_ports[WCD_CPE_AFE_MAX_PORTS + 1];
+static void wcd_cpe_svc_event_cb(const struct cpe_svc_notification *param);
+static int wcd_cpe_setup_irqs(struct wcd_cpe_core *core);
+static void wcd_cpe_cleanup_irqs(struct wcd_cpe_core *core);
+static u32 ramdump_enable;
+
+/* wcd_cpe_lsm_session_active: check if any session is active
+ * return true if any session is active.
+ */
+static bool wcd_cpe_lsm_session_active(void)
+{
+	int index = 1;
+	bool lsm_active = false;
+
+	/* session starts from index 1 */
+	for (; index <= WCD_CPE_LSM_MAX_SESSIONS; index++) {
+		if (lsm_sessions[index] != NULL) {
+			lsm_active = true;
+			break;
+		} else {
+			lsm_active = false;
+		}
+	}
+	return lsm_active;
+}
+
+static int wcd_cpe_collect_ramdump(struct wcd_cpe_core *core)
+{
+	struct cpe_svc_mem_segment dump_seg;
+	int rc;
+
+	dump_seg.type = CPE_SVC_DATA_MEM;
+	dump_seg.cpe_addr = WCD_CPE_DRAM_OFFSET;
+	dump_seg.size = WCD_CPE_DRAM_SIZE;
+	dump_seg.data = core->cpe_dump_v_addr;
+
+	dev_dbg(core->dev,
+		"%s: Reading ramdump from CPE\n",
+		__func__);
+
+	rc = cpe_svc_ramdump(core->cpe_handle, &dump_seg);
+	if (IS_ERR_VALUE(rc)) {
+		dev_err(core->dev,
+			"%s: Failed to read CPE ramdump, err = %d\n",
+			__func__, rc);
+		return rc;
+	}
+
+	dev_dbg(core->dev,
+		"%s: completed reading ramdump from CPE\n",
+		__func__);
+
+	core->cpe_ramdump_seg.address = (unsigned long) core->cpe_dump_addr;
+	core->cpe_ramdump_seg.size = WCD_CPE_DRAM_SIZE;
+	core->cpe_ramdump_seg.v_address = core->cpe_dump_v_addr;
+
+	rc = do_ramdump(core->cpe_ramdump_dev,
+			&core->cpe_ramdump_seg, 1);
+	if (rc)
+		dev_err(core->dev,
+			"%s: fail to dump cpe ram to device, err = %d\n",
+			__func__, rc);
+	return rc;
+}
 
 /* wcd_cpe_is_valid_elf_hdr: check if the ELF header is valid
  * @core: handle to wcd_cpe_core
@@ -385,6 +451,425 @@ static irqreturn_t svass_engine_irq(int irq, void *data)
 			__func__);
 done:
 	return IRQ_HANDLED;
+<<<<<<< HEAD
+=======
+}
+
+/*
+ * wcd_cpe_state_read - update read status in procfs
+ * @entry: snd_info_entry
+ * @buf: buffer where the read status is updated.
+ *
+ */
+static ssize_t wcd_cpe_state_read(struct snd_info_entry *entry,
+			       void *file_private_data, struct file *file,
+			       char __user *buf, size_t count, loff_t pos)
+{
+	int len = 0;
+	char buffer[WCD_CPE_STATE_MAX_LEN];
+	struct wcd_cpe_core *core = NULL;
+	struct wcd_cpe_ssr_entry *ssr_entry = NULL;
+
+	core = (struct wcd_cpe_core *) entry->private_data;
+	if (!core) {
+		pr_err("%s: CPE core NULL\n", __func__);
+		return -EINVAL;
+	}
+	ssr_entry = &core->ssr_entry;
+	rmb();
+	dev_dbg(core->dev,
+		"%s: Offline 0x%x\n", __func__,
+		 ssr_entry->offline);
+
+	WCD_CPE_GRAB_LOCK(&core->ssr_lock, "SSR");
+	len = snprintf(buffer, sizeof(buffer), "%s\n",
+		       ssr_entry->offline ? "OFFLINE" : "ONLINE");
+	WCD_CPE_REL_LOCK(&core->ssr_lock, "SSR");
+
+	return simple_read_from_buffer(buf, count, &pos, buffer, len);
+}
+
+/*
+ * wcd_cpe_state_poll - polls for change state
+ * @entry: snd_info_entry
+ * @wait: wait for duration for poll wait
+ *
+ */
+static unsigned int wcd_cpe_state_poll(struct snd_info_entry *entry,
+					void *private_data, struct file *file,
+					poll_table *wait)
+{
+	struct wcd_cpe_core *core = NULL;
+	struct wcd_cpe_ssr_entry *ssr_entry = NULL;
+	int ret = 0;
+
+	core = (struct wcd_cpe_core *) entry->private_data;
+	if (!core) {
+		pr_err("%s: CPE core NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	ssr_entry = &core->ssr_entry;
+
+	dev_dbg(core->dev, "%s: CPE Poll wait\n",
+	       __func__);
+	poll_wait(file, &ssr_entry->offline_poll_wait, wait);
+	dev_dbg(core->dev, "%s: Wake-up Poll wait\n",
+	       __func__);
+	WCD_CPE_GRAB_LOCK(&core->ssr_lock, "SSR");
+
+	if (xchg(&ssr_entry->offline_change, 0))
+		ret = POLLIN | POLLPRI | POLLRDNORM;
+
+	WCD_CPE_REL_LOCK(&core->ssr_lock, "SSR");
+
+	dev_dbg(core->dev, "%s: ret (%d) from poll_wait\n",
+		__func__, ret);
+	return ret;
+}
+
+/*
+ * wcd_cpe_is_online_state - return true if card is online state
+ * @core: core offline to query
+ */
+bool wcd_cpe_is_online_state(void *core_handle)
+{
+	struct wcd_cpe_core *core = core_handle;
+	if (core_handle) {
+		return !core->ssr_entry.offline;
+	} else {
+		pr_err("%s: Core handle NULL\n", __func__);
+		/* still return 1- offline if core ptr null */
+		return false;
+	}
+}
+
+static struct snd_info_entry_ops wcd_cpe_state_proc_ops = {
+	.read = wcd_cpe_state_read,
+	.poll = wcd_cpe_state_poll,
+};
+
+static int wcd_cpe_enable(struct wcd_cpe_core *core,
+		bool enable)
+{
+	int ret = 0;
+
+	if (enable) {
+		ret = wcd_cpe_setup_irqs(core);
+		if (ret) {
+			dev_err(core->dev,
+				"%s: CPE IRQs setup failed, error = %d\n",
+				__func__, ret);
+			goto done;
+		}
+		/* Dload data section */
+		ret = wcd_cpe_load_fw(core, ELF_FLAG_RW);
+		if (ret) {
+			dev_err(core->dev,
+				"%s: Failed to dload data section, err = %d\n",
+				__func__, ret);
+			goto fail_boot;
+		}
+
+		wcd_cpe_enable_cpe_clks(core, true);
+		ret = cpe_svc_boot(core->cpe_handle,
+				   core->cpe_debug_mode);
+		if (IS_ERR_VALUE(ret)) {
+			dev_err(core->dev,
+				"%s: Failed to boot CPE\n",
+				__func__);
+			goto fail_boot;
+		}
+
+		/* wait for CPE to be online */
+		dev_dbg(core->dev,
+			"%s: waiting for CPE bootup\n",
+			__func__);
+
+		wait_for_completion(&core->online_compl);
+
+		dev_dbg(core->dev,
+			"%s: CPE bootup done\n",
+			__func__);
+
+		core->ssr_type = WCD_CPE_ENABLED;
+	} else {
+		if (core->ssr_type == WCD_CPE_BUS_DOWN_EVENT ||
+		    core->ssr_type == WCD_CPE_SSR_EVENT) {
+			/*
+			 * If this disable vote is when
+			 * SSR is in progress, do not disable CPE here,
+			 * instead SSR handler will control CPE.
+			 */
+			wcd_cpe_enable_cpe_clks(core, false);
+			wcd_cpe_cleanup_irqs(core);
+			goto done;
+		}
+
+		/* Reset CPE first */
+		ret = cpe_svc_reset(core->cpe_handle);
+		if (IS_ERR_VALUE(ret)) {
+			dev_err(core->dev,
+				"%s: Failed to reset CPE with error %d\n",
+				__func__, ret);
+			goto done;
+		}
+
+		wcd_cpe_enable_cpe_clks(core, false);
+		wcd_cpe_cleanup_irqs(core);
+		core->ssr_type = WCD_CPE_IMEM_DOWNLOADED;
+	}
+
+	return ret;
+
+fail_boot:
+	wcd_cpe_cleanup_irqs(core);
+
+done:
+	return ret;
+}
+
+/*
+ * wcd_cpe_boot_ssr: Load the images to CPE after ssr and bootup cpe
+ * @core: handle to the core
+ */
+static int wcd_cpe_boot_ssr(struct wcd_cpe_core *core)
+{
+	int rc = 0;
+
+	if (!core || !core->cpe_handle) {
+		pr_err("%s: Invalid handle\n", __func__);
+		rc = -EINVAL;
+		goto fail;
+	}
+	/* Load the instruction section and mark CPE as online */
+	rc = wcd_cpe_load_fw(core, ELF_FLAG_EXECUTE);
+	if (rc) {
+		dev_err(core->dev,
+			"%s: Failed to load instruction, err = %d\n",
+			__func__, rc);
+		goto fail;
+	} else {
+		wcd_cpe_change_online_state(core, 1);
+	}
+
+fail:
+	return rc;
+}
+
+/*
+ * wcd_cpe_clr_ready_status:
+ *	Clear the value from the ready status for CPE
+ * @core: handle to the core
+ * @value: flag/bitmask that is to be cleared
+ *
+ * This function should not be invoked with ssr_lock acquired
+ */
+static void wcd_cpe_clr_ready_status(struct wcd_cpe_core *core,
+			       u8 value)
+{
+	WCD_CPE_GRAB_LOCK(&core->ssr_lock, "SSR");
+	core->ready_status &= ~(value);
+	dev_dbg(core->dev,
+		"%s: ready_status = 0x%x\n",
+		__func__, core->ready_status);
+	WCD_CPE_REL_LOCK(&core->ssr_lock, "SSR");
+}
+
+/*
+ * wcd_cpe_set_and_complete:
+ *	Set the ready status with the provided value and
+ *	flag the completion object if ready status moves
+ *	to ready to download
+ * @core: handle to the core
+ * @value: flag/bitmask that is to be set
+ */
+static void wcd_cpe_set_and_complete(struct wcd_cpe_core *core,
+				u8 value)
+{
+	WCD_CPE_GRAB_LOCK(&core->ssr_lock, "SSR");
+	core->ready_status |= value;
+	if ((core->ready_status & WCD_CPE_READY_TO_DLOAD) ==
+	    WCD_CPE_READY_TO_DLOAD) {
+		dev_dbg(core->dev,
+			"%s: marking ready, status = 0x%x\n",
+			__func__, core->ready_status);
+		complete(&core->ready_compl);
+	}
+	WCD_CPE_REL_LOCK(&core->ssr_lock, "SSR");
+}
+
+
+/*
+ * wcd_cpe_ssr_work: work function to handle CPE SSR
+ * @work: work that is scheduled to perform CPE shutdown
+ *	and restart
+ */
+void wcd_cpe_ssr_work(struct work_struct *work)
+{
+
+	int rc = 0;
+	u32 irq = 0;
+	struct wcd_cpe_core *core = NULL;
+
+	core = container_of(work, struct wcd_cpe_core, ssr_work);
+	if (!core) {
+		pr_err("%s: Core handle NULL\n", __func__);
+		return;
+	}
+
+	/* Obtain pm request up in case of suspend mode */
+	pm_qos_add_request(&core->pm_qos_req,
+			   PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_DEFAULT_VALUE);
+	pm_qos_update_request(&core->pm_qos_req,
+			msm_cpuidle_get_deep_idle_latency());
+
+	dev_dbg(core->dev,
+		"%s: CPE SSR with event %d\n",
+		__func__, core->ssr_type);
+
+	if (core->ssr_type == WCD_CPE_SSR_EVENT) {
+		rc = snd_soc_read(core->codec,
+				  TOMTOM_A_SVASS_INT_STATUS);
+		if (rc & SVASS_INT_STATUS_RCO_WDOG)
+			irq = CPE_IRQ_RCO_WDOG_INT;
+		else
+			/*
+			 * For all other IRQ's treat
+			 * as WDOG_BITE internally
+			 */
+			irq = CPE_IRQ_WDOG_BITE;
+	} else {
+		/* If bus is down, cdc reg cannot be read */
+		irq = CPE_IRQ_WDOG_BITE;
+	}
+
+	if (core->cpe_users > 0) {
+		rc = cpe_svc_process_irq(core->cpe_handle, irq);
+		if (IS_ERR_VALUE(rc))
+			/*
+			 * Even if process_irq fails,
+			 * wait for cpe to move to offline state
+			 */
+			dev_err(core->dev,
+				"%s: irq processing failed, error = %d\n",
+				__func__, rc);
+
+		rc = wait_for_completion_timeout(&core->offline_compl,
+						 CPE_OFFLINE_WAIT_TIMEOUT);
+		if (!rc) {
+			dev_err(core->dev,
+				"%s: wait for cpe offline timed out\n",
+				__func__);
+			goto err_ret;
+		}
+		if (core->ssr_type != WCD_CPE_BUS_DOWN_EVENT &&
+		    ramdump_enable) {
+			/*
+			 * Ramdump has to be explicitly enabled
+			 * through debugfs and cannot be collected
+			 * when bus is down.
+			 */
+			wcd_cpe_collect_ramdump(core);
+		}
+	} else {
+		pr_err("%s: no cpe users, mark as offline\n", __func__);
+		wcd_cpe_change_online_state(core, 0);
+		wcd_cpe_set_and_complete(core,
+					 WCD_CPE_BLK_READY);
+	}
+
+	rc = wait_for_completion_timeout(&core->ready_compl,
+					 CPE_READY_WAIT_TIMEOUT);
+	if (!rc) {
+		dev_err(core->dev,
+			"%s: ready to online timed out, status = %u\n",
+			__func__, core->ready_status);
+		goto err_ret;
+	}
+
+	rc = wcd_cpe_boot_ssr(core);
+
+	/* Once image are downloaded make sure all
+	 * error interrupts are cleared
+	 */
+	snd_soc_update_bits(core->codec,
+				TOMTOM_A_SVASS_INT_CLR,
+			    0x3F, 0x3F);
+
+err_ret:
+	/* remove after default pm qos */
+	pm_qos_update_request(&core->pm_qos_req,
+			      PM_QOS_DEFAULT_VALUE);
+	pm_qos_remove_request(&core->pm_qos_req);
+}
+
+/*
+ * wcd_cpe_ssr_handle: handle SSR events here.
+ * @core_handle: handle to the cpe core
+ * @event: indicates ADSP or CDSP SSR.
+ */
+int wcd_cpe_ssr_event(void *core_handle,
+		      enum wcd_cpe_ssr_state_event event)
+{
+	struct wcd_cpe_core *core = core_handle;
+
+	if (!core) {
+		pr_err("%s: Invalid handle to core\n",
+			__func__);
+		return -EINVAL;
+	}
+
+	/*
+	 * If CPE is not even enabled, the SSR event for
+	 * CPE needs to be ignored
+	 */
+	if (core->ssr_type == WCD_CPE_INITIALIZED) {
+		dev_info(core->dev,
+			"%s: CPE initialized but not enabled, skip CPE ssr\n",
+			 __func__);
+		return 0;
+	}
+
+	dev_dbg(core->dev,
+		"%s: Schedule ssr work, event = %d\n",
+		__func__, core->ssr_type);
+
+	switch (event) {
+	case WCD_CPE_BUS_DOWN_EVENT:
+		/*
+		 * If bus down, then CPE block is also
+		 * treated to be down
+		 */
+		wcd_cpe_clr_ready_status(core, WCD_CPE_READY_TO_DLOAD);
+		core->ssr_type = event;
+		schedule_work(&core->ssr_work);
+		break;
+
+	case WCD_CPE_SSR_EVENT:
+		wcd_cpe_clr_ready_status(core, WCD_CPE_BLK_READY);
+		core->ssr_type = event;
+		schedule_work(&core->ssr_work);
+		break;
+
+	case WCD_CPE_BUS_UP_EVENT:
+		wcd_cpe_set_and_complete(core, WCD_CPE_BUS_READY);
+		/*
+		 * In case of bus up event ssr_type will be changed
+		 * to WCD_CPE_ACTIVE once CPE is online
+		 */
+		break;
+
+	default:
+		dev_err(core->dev,
+			"%s: unhandled SSR event %d\n",
+			__func__, event);
+		return -EINVAL;
+	}
+
+	return 0;
+>>>>>>> 686f7d8... ASoC: wcd_cpe_core: Add support for CPE ramdump
 }
 
 /*
@@ -625,6 +1110,200 @@ fail_engine_irq:
 	return ret;
 }
 
+<<<<<<< HEAD
+=======
+static int wcd_cpe_get_cal_index(int32_t cal_type)
+{
+	int cal_index = -EINVAL;
+
+	if (cal_type == ULP_AFE_CAL_TYPE)
+		cal_index = WCD_CPE_LSM_CAL_AFE;
+	else if (cal_type == ULP_LSM_CAL_TYPE)
+		cal_index = WCD_CPE_LSM_CAL_LSM;
+
+	return cal_index;
+}
+
+static int wcd_cpe_alloc_cal(int32_t cal_type, size_t data_size, void *data)
+{
+	int ret = 0;
+	int cal_index;
+
+	cal_index = wcd_cpe_get_cal_index(cal_type);
+	if (cal_index < 0) {
+		pr_err("%s: invalid caltype %d\n",
+			__func__, cal_type);
+		return -EINVAL;
+	}
+
+	ret = cal_utils_alloc_cal(data_size, data,
+				  core_d->cal_data[cal_index],
+				  0, NULL);
+	if (ret < 0)
+		pr_err("%s: cal_utils_alloc_block failed, ret = %d, cal type = %d!\n",
+			__func__, ret, cal_type);
+	return ret;
+}
+
+static int wcd_cpe_dealloc_cal(int32_t cal_type, size_t data_size,
+			   void *data)
+{
+	int ret = 0;
+	int cal_index;
+
+	cal_index = wcd_cpe_get_cal_index(cal_type);
+	if (cal_index < 0) {
+		pr_err("%s: invalid caltype %d\n",
+			__func__, cal_type);
+		return -EINVAL;
+	}
+
+	ret = cal_utils_dealloc_cal(data_size, data,
+				    core_d->cal_data[cal_index]);
+	if (ret < 0)
+		pr_err("%s: cal_utils_dealloc_block failed, ret = %d, cal type = %d!\n",
+			__func__, ret, cal_type);
+	return ret;
+}
+
+static int wcd_cpe_set_cal(int32_t cal_type, size_t data_size, void *data)
+{
+	int ret = 0;
+	int cal_index;
+
+	cal_index = wcd_cpe_get_cal_index(cal_type);
+	if (cal_index < 0) {
+		pr_err("%s: invalid caltype %d\n",
+			__func__, cal_type);
+		return -EINVAL;
+	}
+
+	ret = cal_utils_set_cal(data_size, data,
+				core_d->cal_data[cal_index],
+				0, NULL);
+	if (ret < 0)
+		pr_err("%s: cal_utils_set_cal failed, ret = %d, cal type = %d!\n",
+			__func__, ret, cal_type);
+	return ret;
+}
+
+static int wcd_cpe_cal_init(struct wcd_cpe_core *core)
+{
+	int ret = 0;
+
+	struct cal_type_info cal_type_info[] = {
+		{{ULP_AFE_CAL_TYPE,
+		 {wcd_cpe_alloc_cal, wcd_cpe_dealloc_cal, NULL,
+		  wcd_cpe_set_cal, NULL, NULL} },
+		{NULL, NULL, cal_utils_match_buf_num} },
+
+		{{ULP_LSM_CAL_TYPE,
+		 {wcd_cpe_alloc_cal, wcd_cpe_dealloc_cal, NULL,
+		  wcd_cpe_set_cal, NULL, NULL} },
+		 {NULL, NULL, cal_utils_match_buf_num} },
+	};
+
+	ret = cal_utils_create_cal_types(WCD_CPE_LSM_CAL_MAX,
+					 core->cal_data,
+					 cal_type_info);
+	if (ret < 0)
+		pr_err("%s: could not create cal type!\n",
+		       __func__);
+	return ret;
+}
+
+/*
+ * wcd_cpe_enable: setup the cpe interrupts and schedule
+ *	the work to download image and bootup the CPE.
+ * core: handle to cpe core structure
+ */
+static int wcd_cpe_vote(struct wcd_cpe_core *core,
+		bool enable)
+{
+	int ret = 0;
+
+	if (!core) {
+		pr_err("%s: Invalid handle to core\n",
+			__func__);
+		ret = -EINVAL;
+		goto done;
+	}
+
+	dev_dbg(core->dev,
+		"%s: enter, enable = %s, cpe_users = %u\n",
+		__func__, (enable ? "true" : "false"),
+		core->cpe_users);
+
+	if (enable) {
+		if (core->cpe_users == 0) {
+			ret = wcd_cpe_enable(core, enable);
+			if (ret) {
+				dev_err(core->dev,
+					"%s: CPE enable failed, err = %d\n",
+					__func__, ret);
+				goto done;
+			}
+			core->cpe_users++;
+		} else {
+			dev_dbg(core->dev,
+				"%s: cpe already enabled, users = %u\n",
+				__func__, core->cpe_users);
+			goto done;
+		}
+	} else {
+		if (core->cpe_users == 1) {
+			ret = wcd_cpe_enable(core, enable);
+			if (ret) {
+				dev_err(core->dev,
+					"%s: CPE disable failed, err = %d\n",
+					__func__, ret);
+				goto done;
+			}
+			core->cpe_users--;
+		} else {
+			dev_dbg(core->dev,
+				"%s: %u valid users on cpe\n",
+				__func__, core->cpe_users);
+			goto done;
+		}
+	}
+
+	dev_dbg(core->dev,
+		"%s: leave, enable = %s, cpe_users = %u\n",
+		__func__, (enable ? "true" : "false"),
+		core->cpe_users);
+
+done:
+	return ret;
+}
+
+static int wcd_cpe_debugfs_init(struct wcd_cpe_core *core)
+{
+	int rc;
+
+	struct dentry *dir = debugfs_create_dir("wcd_cpe", NULL);
+	if (IS_ERR_OR_NULL(dir)) {
+		dir = NULL;
+		rc = -ENODEV;
+		goto err_create_dir;
+	}
+
+	if (!debugfs_create_u32("ramdump_enable", S_IRUGO | S_IWUSR,
+				dir, &ramdump_enable)) {
+		dev_err(core->dev, "%s: Failed to create debugfs node %s\n",
+			__func__, "ramdump_enable");
+		rc = -ENODEV;
+		goto err_create_entry;
+	}
+
+err_create_entry:
+	debugfs_remove(dir);
+
+err_create_dir:
+	return rc;
+}
+
+>>>>>>> 686f7d8... ASoC: wcd_cpe_core: Add support for CPE ramdump
 /*
  * wcd_cpe_init_and_boot: Initialize and bootup CPE hardware block
  * @img_fname: filename for firmware image
@@ -712,6 +1391,36 @@ struct wcd_cpe_core *wcd_cpe_init_and_boot(const char *img_fname,
 	if (ret)
 		goto fail_setup_irq;
 
+<<<<<<< HEAD
+=======
+	wcd_cpe_debugfs_init(core);
+
+	/* Setup the ramdump device and buffer */
+	core->cpe_ramdump_dev = create_ramdump_device("cpe",
+						      core->dev);
+	if (!core->cpe_ramdump_dev) {
+		dev_err(core->dev,
+			"%s: Failed to create ramdump device\n",
+			__func__);
+		goto schedule_dload_work;
+	}
+
+	core->cpe_dump_v_addr = dma_alloc_coherent(core->dev,
+						   WCD_CPE_DRAM_SIZE,
+						   &core->cpe_dump_addr,
+						   GFP_KERNEL);
+	if (!core->cpe_dump_v_addr) {
+		dev_err(core->dev,
+			"%s: Failed to alloc memory for cpe dump, size = %d\n",
+			__func__, WCD_CPE_DRAM_SIZE);
+		goto schedule_dload_work;
+	} else {
+		memset(core->cpe_dump_v_addr, 0, WCD_CPE_DRAM_SIZE);
+	}
+
+schedule_dload_work:
+	core->ssr_type = WCD_CPE_INITIALIZED;
+>>>>>>> 686f7d8... ASoC: wcd_cpe_core: Add support for CPE ramdump
 	schedule_work(&core->load_fw_work);
 	return core;
 
@@ -1839,7 +2548,24 @@ static int wcd_cpe_dealloc_lsm_session(void *core_handle,
 	lsm_sessions[session->id] = NULL;
 	cmi_deregister(session->cmi_reg_handle);
 	kfree(session);
+<<<<<<< HEAD
 	return 0;
+=======
+
+	ret = wcd_cpe_vote(core, false);
+	if (ret)
+		dev_dbg(core->dev,
+			"%s: Failed to un-vote cpe, err = %d\n",
+			__func__, ret);
+
+	if (!wcd_cpe_lsm_session_active()) {
+		cmi_deregister(core->cmi_afe_handle);
+		core->cmi_afe_handle = NULL;
+		wcd_cpe_deinitialize_afe_port_data();
+	}
+
+	return ret;
+>>>>>>> 686f7d8... ASoC: wcd_cpe_core: Add support for CPE ramdump
 }
 
 static int slim_master_read_enable(void *core_handle,
