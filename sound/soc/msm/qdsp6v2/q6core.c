@@ -184,10 +184,14 @@ int32_t core_set_license(uint32_t key, uint32_t module_id)
 		rc  = -ENOMEM;
 		goto fail_cmd1;
 	}
-	rc = get_meta_info(&metainfo);
-	if (rc) {
-		pr_err("%s: error getting metainfo err:%d\n", __func__, rc);
-		goto fail_cmd2;
+	if (metainfo->nKey != key) {
+		pr_err("%s: metainfo key mismatch!!! found:%x, needed:%x\n",
+				__func__, metainfo->nKey, key);
+		rc = -EINVAL;
+		goto unlock2;
+	} else if (key == 0) {
+		pr_err("%s: metainfo key is %d a invalid key", __func__, key);
+		goto unlock2;
 	}
 
 	paycket_size = sizeof(struct avcs_cmd_set_license) +
