@@ -708,6 +708,7 @@ static int mdp3_irq_setup(void)
 
 int mdp3_iommu_attach(int context)
 {
+	int rc = 0;
 	struct mdp3_iommu_ctx_map *context_map;
 	struct mdp3_iommu_domain_map *domain_map;
 
@@ -722,7 +723,11 @@ int mdp3_iommu_attach(int context)
 
 	domain_map = context_map->domain;
 
-	iommu_attach_device(domain_map->domain, context_map->ctx);
+	rc = iommu_attach_device(domain_map->domain, context_map->ctx);
+	if (rc) {
+		pr_err("mpd3 iommu attach failed\n");
+		return -EINVAL;
+	}
 
 	context_map->attached = true;
 	return 0;
@@ -1940,6 +1945,44 @@ int mdp3_misr_set(struct mdp_misr *misr_req)
 	return ret;
 }
 
+struct mdss_panel_cfg *mdp3_panel_intf_type(int intf_val)
+{
+	if (!mdp3_res || !mdp3_res->pan_cfg.init_done)
+		return ERR_PTR(-EPROBE_DEFER);
+
+	if (mdp3_res->pan_cfg.pan_intf == intf_val)
+		return &mdp3_res->pan_cfg;
+	else
+		return NULL;
+}
+EXPORT_SYMBOL(mdp3_panel_intf_type);
+
+int mdp3_footswitch_ctrl(int enable)
+{
+	int rc = 0;
+
+	if (!mdp3_res->fs_ena && enable) {
+		rc = regulator_enable(mdp3_res->fs);
+		if (rc) {
+			pr_err("mdp footswitch ctrl enable failed\n");
+			return -EINVAL;
+		} else {
+			pr_debug("mdp footswitch ctrl enable success\n");
+			mdp3_res->fs_ena = true;
+		}
+	} else if (mdp3_res->fs_ena && !enable) {
+		rc = regulator_disable(mdp3_res->fs);
+		if (rc)
+			pr_warn("mdp footswitch ctrl disable failed\n");
+		else
+			mdp3_res->fs_ena = false;
+	} else {
+		pr_debug("mdp3 footswitch ctrl already configured\n");
+	}
+
+	return rc;
+}
+
 static int mdp3_probe(struct platform_device *pdev)
 {
 	int rc;
@@ -1992,6 +2035,18 @@ static int mdp3_probe(struct platform_device *pdev)
 	rc = mdp3_res_init();
 	if (rc) {
 		pr_err("unable to initialize mdp3 resources\n");
+		goto probe_done;
+	}
+
+	mdp3_res->fs_ena = false;
+	mdp3_res->fs = devm_regulator_get(&pdev->dev, "vdd");
+	if (IS_ERR_OR_NULL(mdp3_res->fs)) {
+		pr_err("unable to get mdss gdsc regulator\n");
+		return -EINVAL;
+	}
+	rc = mdp3_footswitch_ctrl(1);
+	if (rc) {
+		pr_err("unable to turn on FS\n");
 		goto probe_done;
 	}
 
