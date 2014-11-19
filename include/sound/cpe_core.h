@@ -53,10 +53,11 @@ struct wcd_cpe_lab_hw_params {
 };
 
 struct wcd_cpe_lsm_lab {
-	bool lab_enable;
+	u32 lab_enable;
 	void *slim_handle;
 	void *core_handle;
 	atomic_t in_count;
+	atomic_t abort_read;
 	u32 dma_write;
 	u32 buf_idx;
 	u32 pcm_size;
@@ -162,6 +163,11 @@ struct wcd_cpe_lsm_ops {
 				struct cpe_lsm_session *session,
 				phys_addr_t phys, u8 *mem,
 				u32 read_len);
+
+	int (*lsm_set_data) (void *core_handle,
+			struct cpe_lsm_session *session,
+			enum lsm_detection_mode detect_mode,
+			bool detect_failure);
 };
 
 int wcd_cpe_get_lsm_ops(struct wcd_cpe_lsm_ops *);

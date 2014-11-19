@@ -42,11 +42,6 @@
 #define DOLBY_AUTO_ENDP_IDX			(MAX_DOLBY_PARAMS+3)
 #define DOLBY_AUTO_ENDDEP_IDX			(MAX_DOLBY_PARAMS+4)
 
-#define TOTAL_LENGTH_DOLBY_PARAM		745
-#define NUM_DOLBY_ENDP_DEVICE			24
-#define DOLBY_VIS_PARAM_HEADER_SIZE		 25
-
-#define DOLBY_INVALID_PORT_ID			-1
 /* DOLBY device definitions */
 enum {
 	DOLBY_ENDP_INT_SPEAKERS = 0,
@@ -58,52 +53,28 @@ enum {
 	DOLBY_ENDP_ANALOG,
 };
 
-enum {
-	DEVICE_NONE			= 0x0,
-	/* output devices */
-	EARPIECE			= 0x1,
-	SPEAKER				= 0x2,
-	WIRED_HEADSET			= 0x4,
-	WIRED_HEADPHONE			= 0x8,
-	BLUETOOTH_SCO			= 0x10,
-	BLUETOOTH_SCO_HEADSET		= 0x20,
-	BLUETOOTH_SCO_CARKIT		= 0x40,
-	BLUETOOTH_A2DP			= 0x80,
-	BLUETOOTH_A2DP_HEADPHONES	= 0x100,
-	BLUETOOTH_A2DP_SPEAKER		= 0x200,
-	AUX_DIGITAL			= 0x400,
-	ANLG_DOCK_HEADSET		= 0x800,
-	DGTL_DOCK_HEADSET		= 0x1000,
-	USB_ACCESSORY			= 0x2000,
-	USB_DEVICE			= 0x4000,
-	REMOTE_SUBMIX			= 0x8000,
-	ANC_HEADSET			= 0x10000,
-	ANC_HEADPHONE			= 0x20000,
-	PROXY				= 0x40000,
-	FM				= 0x80000,
-	FM_TX				= 0x100000,
-	DEVICE_OUT_ALL			= 0x7FFFFFFF,
-};
 /* DOLBY device definitions end */
 
 struct dolby_dap_params {
 	uint32_t value[TOTAL_LENGTH_DOLBY_PARAM + MAX_DOLBY_PARAMS];
 } __packed;
 
-int msm_dolby_dap_init(int port_id, int channels, bool is_custom_stereo_on);
+int msm_dolby_dap_init(int port_id, int copp_idx, int channels,
+		       bool is_custom_stereo_on);
 void msm_dolby_dap_deinit(int port_id);
 void msm_dolby_dap_add_controls(struct snd_soc_platform *platform);
-int dolby_dap_set_custom_stereo_onoff(int port_id,
+int dolby_dap_set_custom_stereo_onoff(int port_id, int copp_idx,
 				      bool is_custom_stereo_enabled);
 /* Dolby DOLBY end */
 #else
-int msm_dolby_dap_init(int port_id, int channels, bool is_custom_stereo_on)
+int msm_dolby_dap_init(int port_id, int copp_idx, int channels,
+		       bool is_custom_stereo_on)
 {
 	return 0;
 }
 void msm_dolby_dap_deinit(int port_id) { }
 void msm_dolby_dap_add_controls(struct snd_soc_platform *platform) { }
-int dolby_dap_set_custom_stereo_onoff(int port_id,
+int dolby_dap_set_custom_stereo_onoff(int port_id, int copp_idx,
 				      bool is_custom_stereo_enabled)
 {
 	return 0;
