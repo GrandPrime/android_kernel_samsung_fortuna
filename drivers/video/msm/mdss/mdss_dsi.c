@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -486,7 +486,6 @@ static int mdss_dsi_off(struct mdss_panel_data *pdata, int power_state)
 		panel_info->mipi.frame_rate = panel_info->new_fps;
 
 end:
-	mutex_unlock(&ctrl_pdata->mutex);
 
 	pr_debug("%s-:\n", __func__);
 
@@ -516,7 +515,7 @@ static void __mdss_dsi_ctrl_setup(struct mdss_panel_data *pdata)
 		(pdata->panel_info.fbc.target_bpp) : (pinfo->bpp);
 
 	hbp = mult_frac(pdata->panel_info.lcdc.h_back_porch, dst_bpp,
-			pdata->panel_info.bpp);
+			pdata->panel_info.bpp);<<<<<
 	hfp = mult_frac(pdata->panel_info.lcdc.h_front_porch, dst_bpp,
 			pdata->panel_info.bpp);
 	vbp = mult_frac(pdata->panel_info.lcdc.v_back_porch, dst_bpp,

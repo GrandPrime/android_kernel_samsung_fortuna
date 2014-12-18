@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -720,13 +720,38 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl, int panel_power_state)
 
 	/* Command mode is supported only starting at INTF1 */
 	session = ctl->intf_num - MDSS_MDP_INTF1;
-	ret = mdss_mdp_cmd_intfs_stop(ctl, session, panel_power_state);
-	if (IS_ERR_VALUE(ret)) {
-		pr_err("unable to stop cmd interface: %d\n", ret);
-		return ret;
+	return mdss_mdp_cmd_intfs_stop(ctl, session, panel_power_state);
+}
+
+int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl, int panel_power_state)
+{
+	struct mdss_mdp_cmd_ctx *ctx = ctl->priv_data;
+	struct mdss_mdp_ctl *sctl = mdss_mdp_get_split_ctl(ctl);
+	int ret = 0;
+
+	if (!ctx) {
+		pr_err("invalid ctx\n");
+		return -ENODEV;
 	}
 
-	if (ctl->num == 0) {
+	mutex_lock(&ctl->offlock);
+	if (ctx->panel_power_state != panel_power_state) {
+		ret = mdss_mdp_cmd_stop_sub(ctl, panel_power_state);
+		if (IS_ERR_VALUE(ret)) {
+			pr_err("%s: unable to stop interface: %d\n",
+					__func__, ret);
+			goto end;
+		}
+
+		if (sctl) {
+			mdss_mdp_cmd_stop_sub(sctl, panel_power_state);
+			if (IS_ERR_VALUE(ret)) {
+				pr_err("%s: unable to stop slave intf: %d\n",
+						__func__, ret);
+				goto end;
+			}
+		}
+
 		ret = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_BLANK,
 				(void *) (long int) panel_power_state);
 		WARN(ret, "intf %d unblank error (%d)\n", ctl->intf_num, ret);
@@ -745,9 +770,10 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl, int panel_power_state)
 
 	MDSS_XLOG(ctl->num, ctx->koff_cnt, ctx->clk_enabled,
 				ctx->rdptr_enabled, XLOG_FUNC_EXIT);
+	mutex_unlock(&ctl->offlock);
 	pr_debug("%s:-\n", __func__);
 
-	return 0;
+	return ret;
 }
 
 static int mdss_mdp_cmd_intfs_setup(struct mdss_mdp_ctl *ctl,

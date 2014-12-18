@@ -486,8 +486,6 @@ static void mdss_dsi_link_clk_stop(struct mdss_dsi_ctrl_pdata *ctrl)
 	mdss_dsi_link_clk_unprepare(ctrl);
 }
 
-<<<<<<< HEAD
-=======
 /**
  * mdss_dsi_ulps_config() - Program DSI lanes to enter/exit ULPS mode
  * @ctrl: pointer to DSI controller structure
@@ -875,7 +873,6 @@ error:
 	return rc;
 }
 
->>>>>>> 3ac395c... msm: mdss: add support for different panel power states
 static int __mdss_dsi_update_clk_cnt(u32 *clk_cnt, int enable)
 {
 	int changed = 0;
