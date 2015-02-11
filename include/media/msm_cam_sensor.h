@@ -4,9 +4,14 @@
 #ifdef MSM_CAMERA_BIONIC
 #include <sys/types.h>
 #endif
+
+#include <media/msm_camsensor_sdk.h>
+
 #include <linux/types.h>
-#include <linux/v4l2-mediabus.h>
 #include <linux/i2c.h>
+#ifdef CONFIG_COMPAT
+#include <linux/compat.h>
+#endif
 
 #define I2C_SEQ_REG_SETTING_MAX   5
 #define I2C_SEQ_REG_DATA_MAX      256
@@ -986,6 +991,140 @@ typedef struct
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 8, struct msm_eeprom_cfg_data)
 
 #ifdef CONFIG_COMPAT
+
+struct msm_camera_i2c_reg_setting32 {
+	compat_uptr_t reg_setting;
+	uint16_t size;
+	enum msm_camera_i2c_reg_addr_type addr_type;
+	enum msm_camera_i2c_data_type data_type;
+	uint16_t delay;
+	enum msm_camera_qup_i2c_write_batch_t qup_i2c_batch;
+};
+
+struct msm_actuator_tuning_params_t32 {
+	int16_t initial_code;
+	uint16_t pwd_step;
+	uint16_t region_size;
+	uint32_t total_steps;
+	compat_uptr_t region_params;
+};
+
+struct msm_actuator_params_t32 {
+	enum actuator_type act_type;
+	uint8_t reg_tbl_size;
+	uint16_t data_size;
+	uint16_t init_setting_size;
+	uint32_t i2c_addr;
+	enum msm_actuator_addr_type i2c_addr_type;
+	enum msm_actuator_data_type i2c_data_type;
+	compat_uptr_t reg_tbl_params;
+	compat_uptr_t init_settings;
+	struct park_lens_data_t park_lens;
+};
+
+struct msm_actuator_set_info_t32 {
+	struct msm_actuator_params_t32 actuator_params;
+	struct msm_actuator_tuning_params_t32 af_tuning_params;
+};
+
+struct sensor_init_cfg_data32 {
+	enum msm_sensor_init_cfg_type_t cfgtype;
+	struct msm_sensor_info_t        probed_info;
+	char                            entity_name[MAX_SENSOR_NAME];
+	union {
+		compat_uptr_t setting;
+	} cfg;
+};
+
+struct msm_actuator_move_params_t32 {
+	int8_t dir;
+	int8_t sign_dir;
+	int16_t dest_step_pos;
+	int32_t num_steps;
+	uint16_t curr_lens_pos;
+	compat_uptr_t ringing_params;
+};
+
+struct msm_actuator_cfg_data32 {
+	int cfgtype;
+	uint8_t is_af_supported;
+	union {
+		struct msm_actuator_move_params_t32 move;
+		struct msm_actuator_set_info_t32 set_info;
+		struct msm_actuator_get_info_t get_info;
+		struct msm_actuator_set_position_t setpos;
+		enum af_camera_name cam_name;
+	} cfg;
+};
+
+struct csiphy_cfg_data32 {
+	enum csiphy_cfg_type_t cfgtype;
+	union {
+		compat_uptr_t csiphy_params;
+		compat_uptr_t csi_lane_params;
+	} cfg;
+};
+
+struct sensorb_cfg_data32 {
+	int cfgtype;
+	union {
+		struct msm_sensor_info_t      sensor_info;
+		struct msm_sensor_init_params sensor_init_params;
+		compat_uptr_t                 setting;
+	} cfg;
+};
+
+struct msm_ois_params_t32 {
+	uint16_t data_size;
+	uint16_t setting_size;
+	uint32_t i2c_addr;
+	enum msm_camera_i2c_reg_addr_type i2c_addr_type;
+	enum msm_camera_i2c_data_type i2c_data_type;
+	compat_uptr_t settings;
+};
+
+struct msm_ois_set_info_t32 {
+	struct msm_ois_params_t32 ois_params;
+};
+
+struct msm_ois_cfg_data32 {
+	int cfgtype;
+	union {
+		struct msm_ois_set_info_t32 set_info;
+		compat_uptr_t settings;
+	} cfg;
+};
+
+struct msm_flash_init_info_t32 {
+	enum msm_flash_driver_type flash_driver_type;
+	compat_uptr_t power_setting_array;
+	compat_uptr_t settings;
+};
+
+struct msm_flash_cfg_data_t32 {
+	enum msm_flash_cfg_type_t cfg_type;
+	uint32_t torch_current;
+	uint32_t flash_current[MAX_LED_TRIGGERS];
+	uint32_t flash_duration[MAX_LED_TRIGGERS];
+	union {
+		compat_uptr_t flash_init_info;
+		compat_uptr_t settings;
+		uint32_t flash_current[MAX_LED_TRIGGERS];
+	} cfg;
+};
+
+#define VIDIOC_MSM_ACTUATOR_CFG32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 6, struct msm_actuator_cfg_data32)
+
+#define VIDIOC_MSM_SENSOR_INIT_CFG32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 10, struct sensor_init_cfg_data32)
+
+#define VIDIOC_MSM_CSIPHY_IO_CFG32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 4, struct csiphy_cfg_data32)
+
+#define VIDIOC_MSM_SENSOR_CFG32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 1, struct sensorb_cfg_data32)
+
 #define VIDIOC_MSM_EEPROM_CFG32 \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 8, struct msm_eeprom_cfg_data32)
 #endif
