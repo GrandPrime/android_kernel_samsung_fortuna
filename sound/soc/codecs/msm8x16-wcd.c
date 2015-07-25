@@ -2081,27 +2081,6 @@ static int msm8x16_wcd_codec_enable_spk_pa(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
-sstatic int msm8x16_wcd_tx_disable_pdm_clk(struct snd_soc_dapm_widget *w,
-				struct snd_kcontrol *kcontrol, int event)
-{
-	struct snd_soc_codec *codec = w->codec;
-	struct msm8916_asoc_mach_data *pdata = NULL;
-
-	pdata = snd_soc_card_get_drvdata(codec->card);
-
-	dev_dbg(w->codec->dev, "%s event %d w->name %s\n", __func__,
-			event, w->name);
-	switch (event) {
-	case SND_SOC_DAPM_POST_PMD:
-		if (atomic_read(&pdata->mclk_rsc_ref) == 0)
-			snd_soc_update_bits(codec,
-				MSM8X16_WCD_A_CDC_CLK_PDM_CTL,
-				0x03, 0x00);
-		break;
-	}
-	return 0;
-}
-
 static int msm8x16_wcd_codec_enable_dig_clk(struct snd_soc_dapm_widget *w,
 				     struct snd_kcontrol *kcontrol, int event)
 {
