@@ -1,0 +1,25 @@
+
+==============================================
+START : FUNC_BUILD_KERNEL
+==============================================
+
+build project=k
+build common config=msm8916_sec_defconfig 
+build variant config=msm8916_sec___defconfig 
+build secure option= 
+build SEANDROID option= 
+[33m
+Help
+./build_msm8916_kernel.sh $1 $2 $3
+  $1 : 
+	for ROSSALTE_USA_SPR use rossa_spr
+	for ROSSALTE_USA_VZW use rossa_vzw
+	for ROSSALTE_USA_TFN use rossa_tfn
+	for ROSSALTE_USA_AIO use rossa_aio
+	for GRANDPRIMELTE_USA_AIO use fortuna_aio
+	for J1_USA_VZW use j1_vzw
+  $2 : 
+	-B or Nothing  (-B : Secure Binary)
+  $3 : 
+	-E or Nothing  (-E : SEANDROID Binary)
+[0m
