@@ -2081,58 +2081,48 @@ static int msm8x16_wcd_codec_enable_spk_pa(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+sstatic int msm8x16_wcd_tx_disable_pdm_clk(struct snd_soc_dapm_widget *w,
+				struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = w->codec;
+	struct msm8916_asoc_mach_data *pdata = NULL;
+
+	pdata = snd_soc_card_get_drvdata(codec->card);
+
+	dev_dbg(w->codec->dev, "%s event %d w->name %s\n", __func__,
+			event, w->name);
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMD:
+		if (atomic_read(&pdata->mclk_rsc_ref) == 0)
+			snd_soc_update_bits(codec,
+				MSM8X16_WCD_A_CDC_CLK_PDM_CTL,
+				0x03, 0x00);
+		break;
+	}
+	return 0;
+}
+
 static int msm8x16_wcd_codec_enable_dig_clk(struct snd_soc_dapm_widget *w,
 				     struct snd_kcontrol *kcontrol, int event)
 {
 	struct snd_soc_codec *codec = w->codec;
 	struct msm8x16_wcd_priv *msm8x16_wcd = snd_soc_codec_get_drvdata(codec);
+	struct msm8916_asoc_mach_data *pdata = NULL;
+
+	pdata = snd_soc_card_get_drvdata(codec->card);
 
 	dev_dbg(w->codec->dev, "%s event %d w->name %s\n", __func__,
 			event, w->name);
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		snd_soc_update_bits(codec, w->reg, 0x80, 0x80);
-<<<<<<< HEAD
-		if (msm8x16_wcd->spk_boost_set) {
-			snd_soc_update_bits(codec,
-					MSM8X16_WCD_A_ANALOG_SEC_ACCESS,
-					0xA5, 0xA5);
-			snd_soc_update_bits(codec,
-					MSM8X16_WCD_A_ANALOG_PERPH_RESET_CTL3,
-					0x0F, 0x0F);
-			snd_soc_update_bits(codec,
-					MSM8X16_WCD_A_ANALOG_CURRENT_LIMIT,
-					0x82, 0x82);
-			snd_soc_update_bits(codec,
-					MSM8X16_WCD_A_DIGITAL_CDC_DIG_CLK_CTL,
-					0x20, 0x20);
-			snd_soc_update_bits(codec,
-					MSM8X16_WCD_A_ANALOG_BOOST_EN_CTL,
-					0xDF, 0xDF);
-			usleep_range(CODEC_DELAY_1_MS, CODEC_DELAY_1_1_MS);
-			snd_soc_update_bits(codec,
-					MSM8X16_WCD_A_ANALOG_CURRENT_LIMIT,
-					0x83, 0x83);
-		} else {
-			snd_soc_update_bits(codec, w->reg, 1<<w->shift,
-					1<<w->shift);
-		}
-=======
 		msm8x16_wcd_boost_mode_sequence(codec, SPK_PMU);
->>>>>>> 74e4fa0... ASoC: msm8x16-wcd: add boost option to use it flexible way
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-		if (msm8x16_wcd->spk_boost_set) {
-			snd_soc_update_bits(codec,
-					MSM8X16_WCD_A_ANALOG_BOOST_EN_CTL,
-					0xDF, 0x5F);
+		if (msm8x16_wcd->rx_bias_count == 0)
 			snd_soc_update_bits(codec,
 					MSM8X16_WCD_A_DIGITAL_CDC_DIG_CLK_CTL,
-					0x20, 0x00);
-		} else {
-			snd_soc_update_bits(codec, w->reg, 1<<w->shift, 0x00);
-		}
-		break;
+					0x80, 0x00);
 	}
 	return 0;
 }
