@@ -33,11 +33,7 @@
 #include "audio_ocmem.h"
 
 #define SHARED_MEM_BUF 2
-#ifdef CONFIG_SAMSUNG_AUDIO
-#define VOIP_MAX_Q_LEN 2
-#else
 #define VOIP_MAX_Q_LEN 10
-#endif
 #define VOIP_MAX_VOC_PKT_SIZE 4096
 #define VOIP_MIN_VOC_PKT_SIZE 320
 
@@ -503,7 +499,7 @@ static void voip_process_ul_pkt(uint8_t *voc_pkt,
 		snd_pcm_period_elapsed(prtd->capture_substream);
 	} else {
 		spin_unlock_irqrestore(&prtd->dsp_ul_lock, dsp_flags);
-		pr_debug("UL data dropped\n");
+		pr_err("UL data dropped\n");
 	}
 
 	wake_up(&prtd->out_wait);
@@ -666,7 +662,7 @@ static void voip_process_dl_pkt(uint8_t *voc_pkt, void *private_data)
 	} else {
 		*((uint32_t *)voc_pkt) = 0;
 		spin_unlock_irqrestore(&prtd->dsp_lock, dsp_flags);
-		pr_debug("DL data not available\n");
+		pr_err("DL data not available\n");
 	}
 	wake_up(&prtd->in_wait);
 }
@@ -815,9 +811,14 @@ static int msm_pcm_playback_copy(struct snd_pcm_substream *substream, int a,
 				ret = copy_from_user(&buf_node->frame.voc_pkt,
 							buf, count);
 				buf_node->frame.pktlen = count;
-			} else
+			} else {
 				ret = copy_from_user(&buf_node->frame,
 							buf, count);
+				if (buf_node->frame.pktlen >= count)
+					buf_node->frame.pktlen = count -
+					(sizeof(buf_node->frame.frm_hdr) +
+					 sizeof(buf_node->frame.pktlen));
+			}
 			spin_lock_irqsave(&prtd->dsp_lock, dsp_flags);
 			list_add_tail(&buf_node->list, &prtd->in_queue);
 			spin_unlock_irqrestore(&prtd->dsp_lock, dsp_flags);
@@ -1235,7 +1236,7 @@ msm_pcm_capture_pointer(struct snd_pcm_substream *substream)
 static snd_pcm_uframes_t msm_pcm_pointer(struct snd_pcm_substream *substream)
 {
 	snd_pcm_uframes_t ret = 0;
-	 pr_debug("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		ret = msm_pcm_playback_pointer(substream);
 	else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
@@ -1637,8 +1638,6 @@ static int msm_pcm_probe(struct platform_device *pdev)
 		       __func__, rc);
 	}
 
-	if (pdev->dev.of_node)
-		dev_set_name(&pdev->dev, "%s", "msm-voip-dsp");
 
 	pr_debug("%s: dev name %s\n", __func__, dev_name(&pdev->dev));
 	rc = snd_soc_register_platform(&pdev->dev,

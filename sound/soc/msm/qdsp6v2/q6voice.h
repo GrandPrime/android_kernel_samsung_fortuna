@@ -35,6 +35,35 @@
 #define VOC_REC_DOWNLINK	0x01
 #define VOC_REC_BOTH		0x02
 
+#define VSS_IVERSION_CMD_GET                 0x00011378
+#define VSS_IVERSION_RSP_GET                 0x00011379
+#define CVD_VERSION_STRING_MAX_SIZE          31
+#define CVD_VERSION_DEFAULT                  ""
+#define CVD_VERSION_0_0                      "0.0"
+
+int voc_get_cvd_version(char *);
+
+/* Payload structure for the VSS_IVERSION_RSP_GET command response */
+struct vss_iversion_rsp_get_t {
+	char version[CVD_VERSION_STRING_MAX_SIZE];
+	/* NULL-terminated version string */
+};
+
+enum {
+	CVP_VOC_RX_TOPOLOGY_CAL = 0,
+	CVP_VOC_TX_TOPOLOGY_CAL,
+	CVP_VOCPROC_CAL,
+	CVP_VOCVOL_CAL,
+	CVP_VOCDEV_CFG_CAL,
+	CVP_VOCPROC_COL_CAL,
+	CVP_VOCVOL_COL_CAL,
+	CVS_VOCSTRM_CAL,
+	CVS_VOCSTRM_COL_CAL,
+	VOICE_RTAC_INFO_CAL,
+	VOICE_RTAC_APR_CAL,
+	MAX_VOICE_CAL_TYPES
+};
+
 struct voice_header {
 	uint32_t id;
 	uint32_t data_len;
@@ -72,14 +101,6 @@ struct voice_rec_route_state {
 	u16 ul_flag;
 	u16 dl_flag;
 };
-
-#ifdef CONFIG_SAMSUNG_AUDIO
-struct voice_dha_data {
-	short dha_mode;
-	short dha_select;
-	short dha_params[12];
-};
-#endif /* CONFIG_SAMSUNG_AUDIO */
 
 enum {
 	VOC_INIT = 0,
@@ -221,6 +242,8 @@ struct vss_unmap_memory_cmd {
 #define VSS_IMEMORY_CMD_UNMAP				0x00011337
 #define VSS_IMVM_CMD_SET_CAL_NETWORK			0x0001137A
 #define VSS_IMVM_CMD_SET_CAL_MEDIA_TYPE		0x0001137B
+#define VSS_IHDVOICE_CMD_ENABLE				0x000130A2
+#define VSS_IHDVOICE_CMD_DISABLE			0x000130A3
 
 enum msm_audio_voc_rate {
 		VOC_0_RATE, /* Blank frame */
@@ -356,6 +379,10 @@ struct mvm_set_voice_timing_cmd {
 	struct vss_icommon_cmd_set_voice_timing_t timing;
 } __packed;
 
+struct mvm_set_hd_enable_cmd {
+	struct apr_hdr hdr;
+} __packed;
+
 struct vss_imemory_table_descriptor_t {
 	uint64_t mem_address;
 	/*
@@ -460,6 +487,9 @@ struct vss_imemory_cmd_unmap_t {
 #define VSS_ISTREAM_CMD_REGISTER_CALIBRATION_DATA_V2    0x00011369
 
 #define VSS_ISTREAM_CMD_DEREGISTER_CALIBRATION_DATA     0x0001127A
+
+#define VSS_ISTREAM_CMD_REGISTER_STATIC_CALIBRATION_DATA        0x0001307D
+#define VSS_ISTREAM_CMD_DEREGISTER_STATIC_CALIBRATION_DATA      0x0001307E
 
 #define VSS_ISTREAM_CMD_SET_MEDIA_TYPE			0x00011186
 /* Set media type on the stream. */
@@ -767,52 +797,6 @@ struct vss_icommon_cmd_set_ui_property_enable_t {
 	/* Reserved, set to 0. */
 };
 
-#ifdef CONFIG_SAMSUNG_AUDIO
-#define VOICE_MODULE_DHA        0x10001020
-#define VOICE_PARAM_DHA_DYNAMIC  0x10001022
-
-#define VOICEPROC_MODULE_VENC          0x00010F07
-#define VOICE_PARAM_LOOPBACK_ENABLE  0x00010E18
-
-#define VSS_ICOMMON_CMD_DHA_SET 0x0001128A
-
-struct vss_icommon_cmd_set_loopback_enable_t {
-	uint32_t module_id;
-	/* Unique ID of the module. */
-	uint32_t param_id;
-	/* Unique ID of the parameter. */
-	uint16_t param_size;
-	/* Size of the parameter in bytes: MOD_ENABLE_PARAM_LEN */
-	uint16_t reserved;
-	/* Reserved; set to 0. */
-	uint16_t loopback_enable;
-	uint16_t reserved_field;
-	/* Reserved, set to 0. */
-};
-
-struct oem_dha_parm_send_t {
-	uint32_t module_id;
-	/* Unique ID of the module. */
-	uint32_t param_id;
-	/* Unique ID of the parameter. */
-	uint16_t param_size;
-	/* Size of the parameter in bytes: MOD_ENABLE_PARAM_LEN */
-	uint16_t reserved;
-	/* Reserved; set to 0. */
-	uint16_t eq_mode;
-	uint16_t select;
-	int16_t param[12];
-} __packed;
-
-struct oem_dha_parm_send_cmd {
-	struct apr_hdr hdr;
-	uint32_t mem_handle;
-	uint64_t mem_address;
-	uint32_t mem_size;
-	struct oem_dha_parm_send_t dha_send;
-} __packed;
-#endif /* CONFIG_SAMSUNG_AUDIO */
-
 /*
  * Event sent by the stream to the client that enables Rx DTMF
  * detection whenever DTMF is detected in the Rx path.
@@ -943,16 +927,6 @@ struct cvs_enc_buffer_consumed_cmd {
 	struct apr_hdr hdr;
 } __packed;
 
-#ifdef CONFIG_SAMSUNG_AUDIO
-struct cvs_set_loopback_enable_cmd {
-	struct apr_hdr hdr;
-	uint32_t mem_handle;
-	uint64_t mem_address;
-	uint32_t mem_size;
-	struct vss_icommon_cmd_set_loopback_enable_t vss_set_loopback;
-} __packed;
-#endif /* CONFIG_SAMSUNG_AUDIO */
-
 struct vss_istream_cmd_set_oob_packet_exchange_config_t {
 	struct apr_hdr hdr;
 	uint32_t mem_handle;
@@ -1004,6 +978,12 @@ struct vss_istream_cmd_set_packet_exchange_mode_t {
 
 #define VSS_IVOCPROC_CMD_REGISTER_VOL_CALIBRATION_DATA	0x00011374
 #define VSS_IVOCPROC_CMD_DEREGISTER_VOL_CALIBRATION_DATA	0x00011375
+
+#define VSS_IVOCPROC_CMD_REGISTER_STATIC_CALIBRATION_DATA       0x00013079
+#define VSS_IVOCPROC_CMD_DEREGISTER_STATIC_CALIBRATION_DATA     0x0001307A
+
+#define VSS_IVOCPROC_CMD_REGISTER_DYNAMIC_CALIBRATION_DATA      0x0001307B
+#define VSS_IVOCPROC_CMD_DEREGISTER_DYNAMIC_CALIBRATION_DATA    0x0001307C
 
 #define VSS_IVOCPROC_TOPOLOGY_ID_NONE			0x00010F70
 #define VSS_IVOCPROC_TOPOLOGY_ID_TX_SM_ECNS		0x00010F71
@@ -1484,6 +1464,7 @@ struct voice_data {
 	uint8_t tty_mode;
 	/* slowtalk enable value */
 	uint32_t st_enable;
+	uint32_t hd_enable;
 	uint32_t dtmf_rx_detect_en;
 	/* Local Call Hold mode */
 	uint8_t lch_mode;
@@ -1499,10 +1480,6 @@ struct voice_data {
 	struct voice_rec_route_state rec_route_state;
 
 	struct power_supply *psy;
-
-#ifdef CONFIG_SAMSUNG_AUDIO
-	struct voice_dha_data sec_dha_data;
-#endif /* CONFIG_SAMSUNG_AUDIO */
 };
 
 struct cal_mem {
@@ -1530,6 +1507,8 @@ struct common_data {
 	/* APR to CVP in the Q6 */
 	void *apr_q6_cvp;
 
+	struct cal_type_data *cal_data[MAX_VOICE_CAL_TYPES];
+
 	struct mem_map_table cal_mem_map_table;
 	uint32_t cal_mem_handle;
 
@@ -1554,6 +1533,8 @@ struct common_data {
 	bool srvcc_rec_flag;
 	bool is_destroy_cvd;
 	bool is_vote_bms;
+	char cvd_version[CVD_VERSION_STRING_MAX_SIZE];
+	bool is_per_vocoder_cal_enabled;
 };
 
 struct voice_session_itr {
@@ -1613,10 +1594,6 @@ enum {
 #define VOWLAN_SESSION_VSID 0x10002000
 #define ALL_SESSION_VSID    0xFFFFFFFF
 #define VSID_MAX            ALL_SESSION_VSID
-#ifdef CONFIG_SAMSUNG_AUDIO
-int voice_sec_set_dha_data(uint32_t session_id, short mode,
-					short select, short *parameters);
-#endif /* CONFIG_SAMSUNG_AUDIO */
 
 #define APP_ID_MASK         0x3F000
 #define APP_ID_SHIFT		12
@@ -1633,6 +1610,7 @@ enum vsid_app_type {
 int voc_set_pp_enable(uint32_t session_id, uint32_t module_id,
 		      uint32_t enable);
 int voc_get_pp_enable(uint32_t session_id, uint32_t module_id);
+int voc_set_hd_enable(uint32_t session_id, uint32_t enable);
 uint8_t voc_get_tty_mode(uint32_t session_id);
 int voc_set_tty_mode(uint32_t session_id, uint8_t tty_mode);
 int voc_start_voice_call(uint32_t session_id);
@@ -1673,7 +1651,6 @@ void voc_register_hpcm_evt_cb(hostpcm_cb_fn hostpcm_cb,
 			      void *private_data);
 void voc_deregister_hpcm_evt_cb(void);
 
-int voc_unmap_cal_blocks(void);
 int voc_map_rtac_block(struct rtac_cal_block_data *cal_block);
 int voc_unmap_rtac_block(uint32_t *mem_map_handle);
 
@@ -1690,8 +1667,5 @@ void voc_set_destroy_cvd_flag(bool is_destroy_cvd);
 void voc_set_vote_bms_flag(bool is_vote_bms);
 int voc_disable_topology(uint32_t session_id, uint32_t disable);
 
-#ifdef CONFIG_SAMSUNG_AUDIO
-int voc_get_loopback_enable(void);
-void voc_set_loopback_enable(int loopback_enable);
-#endif /* CONFIG_SAMSUNG_AUDIO */
+uint32_t voice_get_topology(uint32_t topology_idx);
 #endif

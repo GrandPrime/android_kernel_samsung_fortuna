@@ -464,25 +464,7 @@ done:
 	return ret;
 }
 
-#ifdef CONFIG_SAMSUNG_AUDIO
-static int msm_loopback_put(struct snd_kcontrol *kcontrol,
-				 struct snd_ctl_elem_value *ucontrol)
-{
-	int loopback_enable = ucontrol->value.integer.value[0];
 
-	pr_debug("%s: loopback enable=%d\n", __func__, loopback_enable);
-
-	voc_set_loopback_enable(loopback_enable);
-	return 0;
-}
-
-static int msm_loopback_get(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
-{
-	ucontrol->value.integer.value[0] = voc_get_loopback_enable();
-	 return 0;
-}
-#endif /* CONFIG_SAMSUNG_AUDIO */
 
 static const char const *tty_mode[] = {"OFF", "HCO", "VCO", "FULL"};
 static const struct soc_enum msm_tty_mode_enum[] = {
@@ -527,6 +509,21 @@ static int msm_voice_slowtalk_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int msm_voice_hd_voice_put(struct snd_kcontrol *kcontrol,
+				  struct snd_ctl_elem_value *ucontrol)
+{
+	int ret = 0;
+	uint32_t hd_enable = ucontrol->value.integer.value[0];
+	uint32_t session_id = ucontrol->value.integer.value[1];
+
+	pr_debug("%s: HD Voice enable=%d session_id=%#x\n", __func__, hd_enable,
+		 session_id);
+
+	ret = voc_set_hd_enable(session_id, hd_enable);
+
+	return ret;
+}
+
 static int msm_voice_topology_disable_put(struct snd_kcontrol *kcontrol,
 					  struct snd_ctl_elem_value *ucontrol)
 {
@@ -549,34 +546,37 @@ done:
 	return ret;
 }
 
-#ifdef CONFIG_SAMSUNG_AUDIO
-static int msm_sec_dha_get(struct snd_kcontrol *kcontrol,
-			struct snd_ctl_elem_value *ucontrol)
+static int msm_voice_cvd_version_info(struct snd_kcontrol *kcontrol,
+				      struct snd_ctl_elem_info *uinfo)
 {
-	return 0;
-}
-
-static int msm_sec_dha_put(struct snd_kcontrol *kcontrol,
-			struct snd_ctl_elem_value *ucontrol)
-{
-	int i = 0;
 	int ret = 0;
-	int dha_mode = ucontrol->value.integer.value[0];
-	int dha_select = ucontrol->value.integer.value[1];
-	short dha_param[12] = {0,};
-	for (i = 0; i < 12; i++) {
-		dha_param[i] = (short)ucontrol->value.integer.value[2+i];
-		pr_debug("msm_dha_put : param - %d\n", dha_param[i]);
-	}
 
-	ret = voice_sec_set_dha_data(voc_get_session_id(VOICE_SESSION_NAME),
-		dha_mode, dha_select, dha_param);
-	ret = voice_sec_set_dha_data(voc_get_session_id(VOICE2_SESSION_NAME),
-		dha_mode, dha_select, dha_param);
+	pr_debug("%s:\n", __func__);
+
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BYTES;
+	uinfo->count = CVD_VERSION_STRING_MAX_SIZE;
+
 	return ret;
 }
-#endif /* CONFIG_SAMSUNG_AUDIO */
 
+static int msm_voice_cvd_version_get(struct snd_kcontrol *kcontrol,
+				     struct snd_ctl_elem_value *ucontrol)
+{
+	char cvd_version[CVD_VERSION_STRING_MAX_SIZE] = CVD_VERSION_DEFAULT;
+	int ret;
+
+	pr_debug("%s:\n", __func__);
+
+	ret = voc_get_cvd_version(cvd_version);
+
+	if (ret)
+		pr_err("%s: Error retrieving CVD version, error:%d\n",
+			__func__, ret);
+
+	memcpy(ucontrol->value.bytes.data, cvd_version, sizeof(cvd_version));
+
+	return 0;
+}
 static struct snd_kcontrol_new msm_voice_controls[] = {
 	SOC_SINGLE_MULTI_EXT("Voice Rx Device Mute", SND_SOC_NOPM, 0, VSID_MAX,
 				0, 3, NULL, msm_voice_rx_device_mute_put),
@@ -593,12 +593,15 @@ static struct snd_kcontrol_new msm_voice_controls[] = {
 	SOC_SINGLE_MULTI_EXT("Voice Topology Disable", SND_SOC_NOPM, 0,
 			     VSID_MAX, 0, 2, NULL,
 			     msm_voice_topology_disable_put),
-#ifdef CONFIG_SAMSUNG_AUDIO				
-	SOC_SINGLE_MULTI_EXT("Sec Set DHA data", SND_SOC_NOPM, 0, 65535, 0, 14,
-				msm_sec_dha_get, msm_sec_dha_put),
-	SOC_SINGLE_EXT("Loopback Enable", SND_SOC_NOPM, 0, 1, 0,
-				msm_loopback_get, msm_loopback_put),
-#endif /* CONFIG_SAMSUNG_AUDIO */
+	SOC_SINGLE_MULTI_EXT("HD Voice Enable", SND_SOC_NOPM, 0, VSID_MAX, 0, 2,
+			     NULL, msm_voice_hd_voice_put),
+	{
+		.access = SNDRV_CTL_ELEM_ACCESS_READ,
+		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name	= "CVD Version",
+		.info	= msm_voice_cvd_version_info,
+		.get	= msm_voice_cvd_version_get,
+	},
 };
 
 static struct snd_pcm_ops msm_pcm_ops = {
@@ -608,6 +611,7 @@ static struct snd_pcm_ops msm_pcm_ops = {
 	.prepare		= msm_pcm_prepare,
 	.trigger		= msm_pcm_trigger,
 	.ioctl			= msm_pcm_ioctl,
+	.compat_ioctl		= msm_pcm_ioctl,
 };
 
 
@@ -662,8 +666,6 @@ static int msm_pcm_probe(struct platform_device *pdev)
 		       __func__, rc);
 	}
 
-	if (pdev->dev.of_node)
-		dev_set_name(&pdev->dev, "%s", "msm-pcm-voice");
 	pr_debug("%s: dev name %s\n",
 			__func__, dev_name(&pdev->dev));
 	destroy_cvd = of_property_read_bool(pdev->dev.of_node,
