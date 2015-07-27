@@ -10,23 +10,4 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __MSM_BUS_RULE_OPS_H
-#define __MSM_BUS_RULE_OPS_H
-
-#define FLD_IB	0
-#define FLD_AB	1
-#define FLD_CLK	2
-
-#define OP_LE	0
-#define OP_LT	1
-#define OP_GE	2
-#define OP_GT	3
-#define OP_NOOP	4
-
-#define RULE_STATE_NOT_APPLIED	0
-#define RULE_STATE_APPLIED	1
-
-#define THROTTLE_ON	0
-#define THROTTLE_OFF	1
-
-#endif
+#include <uapi/linux/msm-core-interface.h>
