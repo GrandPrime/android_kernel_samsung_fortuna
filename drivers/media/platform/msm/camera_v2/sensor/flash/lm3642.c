@@ -12,7 +12,6 @@
  */
 #include <linux/module.h>
 #include <linux/export.h>
-#include <mach/gpiomux.h>
 #include "msm_camera_io_util.h"
 #include "msm_led_flash.h"
 
@@ -126,14 +125,13 @@ int msm_flash_lm3642_led_release(struct msm_led_flash_ctrl_t *fctrl)
 	struct msm_camera_sensor_board_info *flashdata = NULL;
 	struct msm_camera_power_ctrl_t *power_info = NULL;
 
+	flashdata = fctrl->flashdata;
+	power_info = &flashdata->power_info;
+	LM3642_DBG("%s:%d called\n", __func__, __LINE__);
 	if (!fctrl) {
 		pr_err("%s:%d fctrl NULL\n", __func__, __LINE__);
 		return -EINVAL;
 	}
-
-	flashdata = fctrl->flashdata;
-	power_info = &flashdata->power_info;
-	LM3642_DBG("%s:%d called\n", __func__, __LINE__);
 
 	gpio_set_value_cansleep(
 		power_info->gpio_conf->gpio_num_info->
@@ -155,14 +153,14 @@ int msm_flash_lm3642_led_off(struct msm_led_flash_ctrl_t *fctrl)
 	struct msm_camera_sensor_board_info *flashdata = NULL;
 	struct msm_camera_power_ctrl_t *power_info = NULL;
 
+	flashdata = fctrl->flashdata;
+	power_info = &flashdata->power_info;
+	LM3642_DBG("%s:%d called\n", __func__, __LINE__);
+
 	if (!fctrl) {
 		pr_err("%s:%d fctrl NULL\n", __func__, __LINE__);
 		return -EINVAL;
 	}
-
-	flashdata = fctrl->flashdata;
-	power_info = &flashdata->power_info;
-	LM3642_DBG("%s:%d called\n", __func__, __LINE__);
 
 	if (fctrl->flash_i2c_client && fctrl->reg_setting) {
 		rc = fctrl->flash_i2c_client->i2c_func_tbl->i2c_write_table(

@@ -23,6 +23,7 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/spinlock.h>
 #include "governor_bw_hwmon.h"
 
@@ -39,11 +40,17 @@
 #define MON_MASK(m)		((m)->base + 0x298)
 #define MON_MATCH(m)		((m)->base + 0x29C)
 
+struct bwmon_spec {
+	bool wrap_on_thres;
+	bool overflow;
+};
+
 struct bwmon {
 	void __iomem *base;
 	void __iomem *global_base;
 	unsigned int mport;
 	unsigned int irq;
+	const struct bwmon_spec *spec;
 	struct device *dev;
 	struct bw_hwmon hw;
 };
@@ -96,15 +103,24 @@ static void mon_irq_disable(struct bwmon *m)
 	writel_relaxed(val, MON_INT_EN(m));
 }
 
-static int mon_irq_status(struct bwmon *m)
+static unsigned int mon_irq_status(struct bwmon *m)
 {
-	return readl_relaxed(MON_INT_STATUS(m)) & 0x1;
+	u32 mval, gval;
+
+	mval = readl_relaxed(MON_INT_STATUS(m)),
+	gval = readl_relaxed(GLB_INT_STATUS(m));
+
+	dev_dbg(m->dev, "IRQ status p:%x, g:%x\n", mval, gval);
+
+	return mval;
 }
 
 static void mon_irq_clear(struct bwmon *m)
 {
+	writel_relaxed(0x3, MON_INT_CLR(m));
+	mb();
 	writel_relaxed(1 << m->mport, GLB_INT_CLR(m));
-	writel_relaxed(0x1, MON_INT_CLR(m));
+	mb();
 }
 
 static void mon_set_limit(struct bwmon *m, u32 count)
@@ -118,14 +134,23 @@ static u32 mon_get_limit(struct bwmon *m)
 	return readl_relaxed(MON_THRES(m));
 }
 
-static long mon_get_count(struct bwmon *m)
+#define THRES_HIT(status)	(status & BIT(0))
+#define OVERFLOW(status)	(status & BIT(1))
+static unsigned long mon_get_count(struct bwmon *m)
 {
-	long count;
+	unsigned long count, status;
 
 	count = readl_relaxed(MON_CNT(m));
-	if (mon_irq_status(m))
+	status = mon_irq_status(m);
+
+	dev_dbg(m->dev, "Counter: %08lx\n", count);
+
+	if (OVERFLOW(status) && m->spec->overflow)
+		count += 0xFFFFFFFF;
+	if (THRES_HIT(status) && m->spec->wrap_on_thres)
 		count += mon_get_limit(m);
-	dev_dbg(m->dev, "Count: %ld\n", count);
+
+	dev_dbg(m->dev, "Actual Count: %08lx\n", count);
 
 	return count;
 }
@@ -163,8 +188,17 @@ static unsigned long meas_bw_and_set_irq(struct bw_hwmon *hw,
 
 	mbps = mon_get_count(m);
 	mbps = bytes_to_mbps(mbps, us);
-	/* + 1024 is to workaround HW design issue. Needs further tuning. */
-	limit = mbps_to_bytes(mbps + 1024, sample_ms, tol);
+
+	/*
+	 * If the counter wraps on thres, don't set the thres too low.
+	 * Setting it too low runs the risk of the counter wrapping around
+	 * multiple times before the IRQ is processed.
+	 */
+	if (likely(!m->spec->wrap_on_thres))
+		limit = mbps_to_bytes(mbps, sample_ms, tol);
+	else
+		limit = mbps_to_bytes(max(mbps, 400UL), sample_ms, tol);
+
 	mon_set_limit(m, limit);
 
 	mon_clear(m);
@@ -196,7 +230,8 @@ static int start_bw_hwmon(struct bw_hwmon *hw, unsigned long mbps)
 				  IRQF_ONESHOT | IRQF_SHARED,
 				  dev_name(m->dev), m);
 	if (ret) {
-		dev_err(m->dev, "Unable to register interrupt handler!\n");
+		dev_err(m->dev, "Unable to register interrupt handler! (%d)\n",
+				ret);
 		return ret;
 	}
 
@@ -221,17 +256,53 @@ static void stop_bw_hwmon(struct bw_hwmon *hw)
 	free_irq(m->irq, m);
 	mon_disable(m);
 	mon_irq_disable(m);
-	mon_irq_clear(m);
 	mon_clear(m);
+	mon_irq_clear(m);
+}
+
+static int suspend_bw_hwmon(struct bw_hwmon *hw)
+{
+	struct bwmon *m = to_bwmon(hw);
+
+	disable_irq(m->irq);
+	mon_disable(m);
+	mon_irq_disable(m);
+	mon_irq_clear(m);
+
+	return 0;
+}
+
+static int resume_bw_hwmon(struct bw_hwmon *hw)
+{
+	struct bwmon *m = to_bwmon(hw);
+
+	mon_clear(m);
+	mon_irq_enable(m);
+	mon_enable(m);
+	enable_irq(m->irq);
+
+	return 0;
 }
 
 /*************************************************************************/
+
+static const struct bwmon_spec spec[] = {
+	{ .wrap_on_thres = true, .overflow = false },
+	{ .wrap_on_thres = false, .overflow = true },
+};
+
+static struct of_device_id match_table[] = {
+	{ .compatible = "qcom,bimc-bwmon", .data = &spec[0] },
+	{ .compatible = "qcom,bimc-bwmon2", .data = &spec[1] },
+	{}
+};
 
 static int bimc_bwmon_driver_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct resource *res;
 	struct bwmon *m;
+	const struct of_device_id *id;
 	int ret;
 	u32 data;
 
@@ -246,6 +317,13 @@ static int bimc_bwmon_driver_probe(struct platform_device *pdev)
 		return ret;
 	}
 	m->mport = data;
+
+	id = of_match_device(match_table, dev);
+	if (!id) {
+		dev_err(dev, "Unknown device type!\n");
+		return -ENODEV;
+	}
+	m->spec = id->data;
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "base");
 	if (!res) {
@@ -280,6 +358,8 @@ static int bimc_bwmon_driver_probe(struct platform_device *pdev)
 		return -EINVAL;
 	m->hw.start_hwmon = &start_bw_hwmon,
 	m->hw.stop_hwmon = &stop_bw_hwmon,
+	m->hw.suspend_hwmon = &suspend_bw_hwmon,
+	m->hw.resume_hwmon = &resume_bw_hwmon,
 	m->hw.meas_bw_and_set_irq = &meas_bw_and_set_irq,
 
 	ret = register_bw_hwmon(dev, &m->hw);
@@ -290,11 +370,6 @@ static int bimc_bwmon_driver_probe(struct platform_device *pdev)
 
 	return 0;
 }
-
-static struct of_device_id match_table[] = {
-	{ .compatible = "qcom,bimc-bwmon" },
-	{}
-};
 
 static struct platform_driver bimc_bwmon_driver = {
 	.probe = bimc_bwmon_driver_probe,
