@@ -433,7 +433,7 @@ static void send_sysmon_notif(struct subsys_device *dev)
 	mutex_lock(&subsys_list_lock);
 	list_for_each_entry(subsys, &subsys_list, list)
 		if ((subsys->notif_state > 0) && (subsys != dev))
-			sysmon_send_event(dev->desc->name, subsys->desc->name,
+			sysmon_send_event(dev->desc, subsys->desc,
 						subsys->notif_state);
 	mutex_unlock(&subsys_list_lock);
 }
