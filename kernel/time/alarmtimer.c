@@ -86,15 +86,6 @@ void set_power_on_alarm(long secs, bool enable)
 	rtc_tm_to_time(&rtc_time, &rtc_secs);
 	alarm_delta = wall_time.tv_sec - rtc_secs;
 	alarm_time = power_on_alarm - alarm_delta;
-	rtc_read_time(rtcdev, &rtc_time);
-	rtc_tm_to_time(&rtc_time, &rtc_secs);
-
-	if (!secs)
-		goto disable_alarm;
-	else
-		power_on_alarm = secs + rtc_secs;
-
-	alarm_time = power_on_alarm;
 
 	/*
 	 *Substract ALARM_DELTA from actual alarm time
@@ -1011,7 +1002,6 @@ static int __init alarmtimer_init(void)
 		.nsleep		= alarm_timer_nsleep,
 	};
 
-	mutex_init(&power_on_alarm_lock);
 	alarmtimer_rtc_timer_init();
 
 	posix_timers_register_clock(CLOCK_REALTIME_ALARM, &alarm_clock);
