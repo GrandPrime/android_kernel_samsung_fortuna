@@ -45,6 +45,7 @@ static void get_chip_vendor(void *device_data);
 static void get_chip_name(void *device_data);
 static void get_x_num(void *device_data);
 static void get_y_num(void *device_data);
+static void get_checksum_data(void *device_data);
 static void run_reference_read(void *device_data);
 static void get_reference(void *device_data);
 static void run_rawcap_read(void *device_data);
@@ -54,13 +55,18 @@ static void get_delta(void *device_data);
 static void run_abscap_read(void *device_data);
 static void run_absdelta_read(void *device_data);
 static void run_trx_short_test(void *device_data);
+static void get_cx_data(void *device_data);
+static void get_cx_all_data(void *device_data);
+static void run_cx_data_read(void *device_data);
 static void set_tsp_test_result(void *device_data);
 static void get_tsp_test_result(void *device_data);
 static void hover_enable(void *device_data);
 static void hover_no_sleep_enable(void *device_data);
 static void glove_mode(void *device_data);
 static void get_glove_sensitivity(void *device_data);
+#ifdef CLEAR_COVER
 static void clear_cover_mode(void *device_data);
+#endif
 static void fast_glove_mode(void *device_data);
 static void report_rate(void *device_data);
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
@@ -71,10 +77,11 @@ static void interrupt_control(void *device_data);
 static int read_touchkey_data(struct fts_ts_info *info, unsigned char type, unsigned int keycode);
 #endif
 
-#if defined(TOUCH_BOOSTER_DVFS)
+#if defined(TSP_BOOSTER)
 static void boost_level(void *device_data);
 #endif
 
+static void run_autotune_enable(void *device_data);
 static void not_support_cmd(void *device_data);
 static ssize_t store_cmd(struct device *dev, struct device_attribute *devattr,
 			   const char *buf, size_t count);
@@ -84,6 +91,8 @@ static ssize_t show_cmd_result(struct device *dev,
 				struct device_attribute *devattr, char *buf);
 static ssize_t cmd_list_show(struct device *dev,
 				struct device_attribute *attr, char *buf);
+
+extern void fts_release_all_finger(struct fts_ts_info *info);
 
 #define FT_CMD(name, func)	.cmd_name = name, .cmd_func = func
 struct ft_cmd {
@@ -105,6 +114,7 @@ struct ft_cmd ft_cmds[] = {
 	{FT_CMD("get_chip_name", get_chip_name),},
 	{FT_CMD("get_x_num", get_x_num),},
 	{FT_CMD("get_y_num", get_y_num),},
+	{FT_CMD("get_checksum_data", get_checksum_data),},
 	{FT_CMD("run_reference_read", run_reference_read),},
 	{FT_CMD("get_reference", get_reference),},
 	{FT_CMD("run_rawcap_read", run_rawcap_read),},
@@ -114,21 +124,27 @@ struct ft_cmd ft_cmds[] = {
 	{FT_CMD("run_abscap_read" , run_abscap_read),},
 	{FT_CMD("run_absdelta_read", run_absdelta_read),},
 	{FT_CMD("run_trx_short_test", run_trx_short_test),},
+	{FT_CMD("get_cx_data", get_cx_data),},
+	{FT_CMD("get_cx_all_data", get_cx_all_data),},
+	{FT_CMD("run_cx_data_read", run_cx_data_read),},
 	{FT_CMD("set_tsp_test_result", set_tsp_test_result),},
 	{FT_CMD("get_tsp_test_result", get_tsp_test_result),},
 	{FT_CMD("hover_enable", hover_enable),},
 	{FT_CMD("hover_no_sleep_enable", hover_no_sleep_enable),},
 	{FT_CMD("glove_mode", glove_mode),},
 	{FT_CMD("get_glove_sensitivity", get_glove_sensitivity),},
+#ifdef CLEAR_COVER	
 	{FT_CMD("clear_cover_mode", clear_cover_mode),},
+#endif
 	{FT_CMD("fast_glove_mode", fast_glove_mode),},
 	{FT_CMD("report_rate", report_rate),},
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 	{FT_CMD("interrupt_control", interrupt_control),},
 #endif
-#if defined(TOUCH_BOOSTER_DVFS)
+#if defined(TSP_BOOSTER)
 	{FT_CMD("boost_level", boost_level),},
 #endif
+	{FT_CMD("run_autotune_enable", run_autotune_enable),},
 	{FT_CMD("not_support_cmd", not_support_cmd),},
 };
 
@@ -927,14 +943,16 @@ static int fts_panel_ito_test(struct fts_ts_info *info)
 
 	if (info->hover_enabled)
 		fts_command(info, FTS_CMD_HOVER_ON);
-
+#ifdef CLEAR_COVER	
 	if (info->flip_enable) {
 		fts_set_flipcover_mode(info, true);
-	} else {
+	} else 
+#endif
+	{
 		if (info->mshover_enabled)
 			fts_command(info, FTS_CMD_MSHOVER_ON);
 	}
-#ifdef FTS_SUPPORT_TA_MODE
+#ifdef USE_TSP_TA_CALLBACKS
 	if (info->TA_Pluged)
 		fts_command(info, FTS_CMD_CHARGER_PLUGGED);
 #endif
@@ -1106,7 +1124,7 @@ static void get_chip_name(void *device_data)
 {
 	struct fts_ts_info *info = (struct fts_ts_info *)device_data;
 	char buff[16] = { 0 };
-	strncpy(buff, "FTS", sizeof(buff));
+	strncpy(buff, "FTS2B048", sizeof(buff));
 	set_default_result(info);
 	set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
 	info->cmd_state = CMD_STATUS_OK;
@@ -1138,6 +1156,33 @@ static void get_y_num(void *device_data)
 	info->cmd_state = CMD_STATUS_OK;
 	tsp_debug_info(true, &info->client->dev, "%s: %s(%d)\n", __func__, buff,
 		  strnlen(buff, sizeof(buff)));
+}
+
+static void get_checksum_data(void *device_data)
+{
+	struct fts_ts_info *info = (struct fts_ts_info *)device_data;
+	char buff[16] = { 0 };
+	int rc;
+	unsigned char regAdd[3];
+	unsigned char buf[5];
+ 
+ 	set_default_result(info);
+
+	regAdd[0] = 0xb3;
+	regAdd[1] = 0x00;
+	regAdd[2] = 0x00;
+	info->fts_write_reg(info, regAdd, 3);
+	fts_delay(1);
+
+	regAdd[0] = 0xB1;
+	regAdd[1] = 0xFF;
+	regAdd[2] = 0xFC;
+	rc = info->fts_read_reg(info, regAdd, 3, buf, 5);
+
+	snprintf(buff, sizeof(buff), "%02X%02X%02X%02X", buf[1], buf[2], buf[3], buf[4]);
+	set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
+	info->cmd_state = CMD_STATUS_OK;
+	tsp_debug_info(true, &info->client->dev, "%s: %s(%d)\n", __func__, buff, strnlen(buff, sizeof(buff)));
 }
 
 static void run_reference_read(void *device_data)
@@ -1203,6 +1248,10 @@ static void run_rawcap_read(void *device_data)
 	short min = 0x7FFF;
 	short max = 0x8000;
 
+	unsigned char data[FTS_EVENT_SIZE];
+	unsigned char regAdd;
+	int fail_retry = 0;
+
 	set_default_result(info);
 
 	if (info->touch_stopped) {
@@ -1213,8 +1262,42 @@ static void run_rawcap_read(void *device_data)
 		info->cmd_state = CMD_STATUS_NOT_APPLICABLE;
 		return;
 	}
+	if (!info->run_autotune)
+		goto rawcap_read;
+	else
+		dev_info(&info->client->dev, "%s: set autotune\n\n", __func__);
 
-	fts_delay(500);
+	fts_interrupt_set(info, INT_DISABLE);
+	fts_command(info, SENSEOFF);
+	fts_delay(100);
+
+	fts_command(info, CX_TUNNING);
+	fts_delay(300);
+
+	regAdd = READ_ONE_EVENT;
+
+	while (fts_read_reg(info, &regAdd, 1, (unsigned char *)data, FTS_EVENT_SIZE)) {
+		if ((data[0] == EVENTID_STATUS_EVENT) &&
+			 (data[1] == 0x0B) && (data[2] == 0x03)) {
+			break;
+		}
+
+		if (fail_retry++ > FTS_RETRY_COUNT * 7) {
+			tsp_debug_info(true, info->dev, "%s: Raw data read Time Over\n", __func__);
+			break;
+		}
+		fts_delay(10);
+	}
+	fts_command(info, SENSEON);
+	fts_delay(100);
+	fts_command(info, FORCECALIBRATION);
+
+	fts_command(info, FLUSHBUFFER);
+
+	fts_interrupt_set(info, INT_ENABLE);
+
+rawcap_read:
+	//fts_delay(500);
 	fts_read_frame(info, TYPE_FILTERED_DATA, &min, &max);
 
 	snprintf(buff, sizeof(buff), "%d,%d", min, max);
@@ -1452,6 +1535,208 @@ static void run_trx_short_test(void *device_data)
 	tsp_debug_info(true, &info->client->dev, "%s: %s\n", __func__, buff);
 }
 
+#define FTS_MAX_TX_LENGTH		44
+#define FTS_MAX_RX_LENGTH		64
+
+#define FTS_CX2_READ_LENGTH		4
+#define FTS_CX2_ADDR_OFFSET		3
+#define FTS_CX2_TX_START		0
+#define FTS_CX2_BASE_ADDR		0x1000
+
+static void get_cx_data(void *device_data)
+{
+	struct fts_ts_info *info = (struct fts_ts_info *)device_data;
+	char buff[CMD_STR_LEN] = { 0 };
+	short val = 0;
+	int node = 0;
+
+	set_default_result(info);
+	if (info->touch_stopped || !info->cx_data) {
+		tsp_debug_info(true, &info->client->dev, "%s: [ERROR] Touch is stopped\n",
+			__func__);
+		snprintf(buff, sizeof(buff), "%s", "TSP turned off");
+		set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
+		info->cmd_state = CMD_STATUS_NOT_APPLICABLE;
+		return;
+	}
+
+	node = fts_check_index(info);
+	if (node < 0)
+		return;
+
+	val = info->cx_data[node];
+	snprintf(buff, sizeof(buff), "%d", val);
+	set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
+	info->cmd_state = CMD_STATUS_OK;
+	tsp_debug_info(true, &info->client->dev, "%s: %s(%d)\n", __func__, buff,
+		   strnlen(buff, sizeof(buff)));
+
+}
+
+static void get_cx_all_data(void *device_data)
+{
+	const char HEX[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+	struct fts_ts_info *info = (struct fts_ts_info *)device_data;
+	char mbuff[CMD_STR_LEN] = { 0 };
+	char *buff;
+	int i, j;
+	char *pBuf;
+
+	set_default_result(info);
+
+	if (info->touch_stopped) {
+		tsp_debug_info(true, &info->client->dev, "%s: [ERROR] Touch is stopped\n",
+                                    __func__);
+		snprintf(mbuff, sizeof(buff), "%s", "TSP turned off");
+		set_cmd_result(info, mbuff, strnlen(mbuff, sizeof(mbuff)));
+		info->cmd_state = CMD_STATUS_NOT_APPLICABLE;
+		return;
+	}
+
+ 
+
+	buff = kzalloc(info->ForceChannelLength*info->SenseChannelLength*2, GFP_KERNEL);
+	if (buff!=NULL)
+	{
+		pBuf = buff;
+		if (info->cx_data) {
+			for (j = 0; j < info->ForceChannelLength; j++) {
+				for(i = 0; i < info->SenseChannelLength; i++) {
+					*pBuf++ = HEX[(info->cx_data[(j * info->SenseChannelLength) + i]>>4)&0x0f];
+					*pBuf++ = HEX[info->cx_data[(j * info->SenseChannelLength) + i]&0x0f];
+				}
+				//          tsp_debug_info(true, &info->client->dev, "%s", info->cx_data[(j * info->SenseChannelLength) + i]);
+			}
+			//tsp_debug_info(true, &info->client->dev, "%s", info->cx_data[(j * info->SenseChannelLength) + i]);
+		}
+		set_cmd_result(info, buff, info->ForceChannelLength*info->SenseChannelLength*2);
+		info->cmd_state = CMD_STATUS_OK;
+		tsp_debug_info(true, &info->client->dev, "%s: %s(%d)\n", __func__, buff,
+		info->ForceChannelLength*info->SenseChannelLength*2);
+		kfree(buff);
+	}
+
+	else
+	{
+		snprintf(mbuff, sizeof(mbuff), "%s", "kmalloc Error");
+		set_cmd_result(info, mbuff, strnlen(mbuff, sizeof(mbuff)));
+		info->cmd_state = CMD_STATUS_NOT_APPLICABLE;
+	}
+}
+
+
+static void run_cx_data_read(void *device_data)
+{
+	struct fts_ts_info *info = (struct fts_ts_info *)device_data;
+	char buff[CMD_STR_LEN] = { 0 };
+	unsigned char ReadData[info->ForceChannelLength][info->SenseChannelLength + FTS_CX2_READ_LENGTH];
+	unsigned char regAdd[8];
+	unsigned char buf[8];
+	unsigned char r_addr = READ_ONE_EVENT;
+	unsigned int addr, rx_num, tx_num;
+	int i, j, cx_rx_length, max_tx_length, max_rx_length, address_offset = 0, start_tx_offset = 0, retry = 0;
+	unsigned char *pStr = NULL;
+	unsigned char pTmp[16] = { 0 };
+
+	set_default_result(info);
+
+	if (info->touch_stopped) {
+		tsp_debug_info(true, &info->client->dev, "%s: [ERROR] Touch is stopped\n",
+			__func__);
+		snprintf(buff, sizeof(buff), "%s", "TSP turned off");
+		set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
+		info->cmd_state = CMD_STATUS_NOT_APPLICABLE;
+		return;
+	}
+
+	fts_command(info, SENSEOFF);
+	disable_irq(info->irq);
+	fts_command(info, FLUSHBUFFER);
+	fts_delay(50);
+
+	tx_num = info->ForceChannelLength;
+	rx_num = info->SenseChannelLength;
+
+	max_tx_length = FTS_MAX_TX_LENGTH -4;
+	max_rx_length = FTS_MAX_RX_LENGTH -4;
+
+	start_tx_offset = FTS_CX2_TX_START * max_rx_length / FTS_CX2_READ_LENGTH * FTS_CX2_ADDR_OFFSET;
+	address_offset = max_rx_length /FTS_CX2_READ_LENGTH;
+
+	pStr = kzalloc(4 * (rx_num + 1), GFP_KERNEL);
+	if (pStr == NULL) {
+		tsp_debug_info(true, &info->client->dev, "FTS pStr kzalloc failed\n");
+		return;
+	}
+
+	dev_info(&info->client->dev, "%s: start \n", __func__);
+	for(j = 0; j < tx_num; j++) {
+
+
+		memset(pStr, 0x0, 4 * (rx_num + 1));
+		snprintf(pTmp, sizeof(pTmp), "Tx%02d | ", j);
+		strncat(pStr, pTmp, 4 * rx_num);
+
+
+		addr = FTS_CX2_BASE_ADDR + (j * address_offset * FTS_CX2_ADDR_OFFSET) + start_tx_offset;
+
+		if(rx_num % FTS_CX2_READ_LENGTH != 0)
+			cx_rx_length = rx_num / FTS_CX2_READ_LENGTH + 1;
+		else
+			cx_rx_length = rx_num / FTS_CX2_READ_LENGTH;
+
+		for(i = 0; i < cx_rx_length; i++) {
+			regAdd[0] = 0xB2;
+			regAdd[1] = (addr >> 8) & 0xff;
+			regAdd[2] = (addr & 0xff);
+			regAdd[3] = 0x04;
+			fts_write_reg(info, &regAdd[0], 4);
+
+			retry = 100;
+			do {
+				if (retry < 0) {
+					dev_err(&info->client->dev,
+							"%s: failed to compare buf, break!\n", __func__);
+					break;
+				}
+
+				fts_read_reg(info, &r_addr, 1, &buf[0], FTS_EVENT_SIZE);
+				retry--;
+			} while (buf[1] != regAdd[1] || buf[2] != regAdd[2]);
+
+			ReadData[j][i * 4] = buf[3] & 0x3F;
+			ReadData[j][i * 4 + 1] = (buf[3] & 0xC0) >> 6 | (buf[4] & 0x0F) << 2;
+			ReadData[j][i * 4 + 2] = ((buf[4] & 0xF0)>> 4) | ((buf[5] & 0x03) << 4);
+			ReadData[j][i * 4 + 3] = buf[5] >> 2;
+			addr = addr + 3;
+
+			snprintf(pTmp, sizeof(pTmp), "%3d%3d%3d%3d ", 
+		        ReadData[j][i*4], ReadData[j][i*4+1], ReadData[j][i*4+2], ReadData[j][i*4+3]);
+			strncat(pStr, pTmp, 4 *rx_num);
+
+		}
+
+		tsp_debug_info(true, &info->client->dev, "FTS %s\n", pStr);
+
+	}
+
+	if (info->cx_data) {
+		for (j = 0; j < tx_num; j++) {
+			for(i = 0; i < rx_num; i++)
+				info->cx_data[(j * rx_num) + i] = ReadData[j][i];
+		}
+	}
+	snprintf(buff, sizeof(buff), "%s", "OK");
+	enable_irq(info->irq);
+	fts_command(info, SENSEON);
+	kfree(pStr);
+
+	info->cmd_state = CMD_STATUS_OK;
+	set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
+	tsp_debug_info(true, &info->client->dev, "%s: %s\n", __func__, buff);
+}
+
+
 static void set_tsp_test_result(void *device_data)
 {
 	struct fts_ts_info *info = (struct fts_ts_info *)device_data;
@@ -1516,6 +1801,8 @@ static void get_tsp_test_result(void *device_data)
 		}
 		fts_delay(10);
 	}
+
+	info->cmd_state = CMD_STATUS_OK;
 }
 
 static void hover_enable(void *device_data)
@@ -1673,7 +1960,7 @@ static void get_glove_sensitivity(void *device_data)
 		msleep(10);
 	}
 }
-
+#ifdef CLEAR_COVER
 static void clear_cover_mode(void *device_data)
 {
 	struct fts_ts_info *info = (struct fts_ts_info *)device_data;
@@ -1718,7 +2005,7 @@ static void clear_cover_mode(void *device_data)
 
 	tsp_debug_info(true, &info->client->dev, "%s: %s\n", __func__, buff);
 };
-
+#endif
 static void fast_glove_mode(void *device_data)
 {
 	struct fts_ts_info *info = (struct fts_ts_info *)device_data;
@@ -1871,44 +2158,41 @@ out:
 }
 #endif
 
-#ifdef TOUCH_BOOSTER_DVFS
+#ifdef TSP_BOOSTER
 static void boost_level(void *device_data)
 {
 	struct fts_ts_info *info = (struct fts_ts_info *)device_data;
-	struct i2c_client *client = info->client;
+//	struct i2c_client *client = info->client;
 	char buff[CMD_STR_LEN] = { 0 };
+	int stage;
 	int retval = 0;
 
 	set_default_result(info);
 
-#ifdef CONFIG_SEC_S_PROJECT
-	/* Level 5 is replaced to Level 3  */
-	if(info->cmd_param[0] == DVFS_STAGE_PENTA){
-		info->cmd_param[0] = DVFS_STAGE_TRIPLE;
+	stage = 1 << info->cmd_param[0];
+	if (!(info->booster->dvfs_stage & stage)) {
+		snprintf(buff, sizeof(buff), "NG");
+		info->cmd_state = CMD_STATUS_FAIL;
+		dev_err(&info->client->dev,"%s: %d is not supported(%04x != %04x).\n",__func__,
+			info->cmd_param[0], stage, info->booster->dvfs_stage);
+
+		goto boost_out;
 	}
-#endif
-	info->dvfs_boost_mode = info->cmd_param[0];
 
-	dev_info(&client->dev,
-			"%s: dvfs_boost_mode = %d\n",
-			__func__, info->dvfs_boost_mode);
-
+	info->booster->dvfs_boost_mode = stage;
 	snprintf(buff, sizeof(buff), "OK");
 	info->cmd_state = CMD_STATUS_OK;
 
-	if (info->dvfs_boost_mode == DVFS_STAGE_NONE) {
-		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
+	if (info->booster->dvfs_boost_mode == DVFS_STAGE_NONE) {
+		retval = info->booster->dvfs_off(info->booster);
 		if (retval < 0) {
-			dev_err(&info->client->dev,
-					"%s: booster stop failed(%d).\n",
-					__func__, retval);
+			dev_err(&info->client->dev,"%s: booster stop failed(%d).\n",__func__, retval);
 			snprintf(buff, sizeof(buff), "NG");
 			info->cmd_state = CMD_STATUS_FAIL;
-
-			info->dvfs_lock_status = false;
 		}
 	}
-
+	
+boost_out:
 	set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
 	info->cmd_state = CMD_STATUS_WAITING;
 
@@ -1920,3 +2204,25 @@ static void boost_level(void *device_data)
 }
 #endif
 #endif
+static void run_autotune_enable(void *device_data)
+{
+	struct fts_ts_info *info = (struct fts_ts_info *)device_data;
+	char buff[CMD_STR_LEN] = { 0 };
+
+	set_default_result(info);
+
+	info->run_autotune = info->cmd_param[0];
+
+	dev_info(&info->client->dev, "%s: command is %s\n",
+			__func__, info->run_autotune ? "ENABLE" : "DISABLE");
+
+	set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
+
+	mutex_lock(&info->cmd_lock);
+	info->cmd_is_running = false;
+	mutex_unlock(&info->cmd_lock);
+	info->cmd_state = CMD_STATUS_WAITING;
+
+	dev_info(&info->client->dev, "%s: %s\n", __func__, buff);
+}
+

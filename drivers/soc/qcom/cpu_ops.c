@@ -15,6 +15,7 @@
  * Based on arch/arm64/kernel/smp_spin_table.c
  */
 
+#include <linux/bitops.h>
 #include <linux/cpu.h>
 #include <linux/cpumask.h>
 #include <linux/delay.h>
@@ -24,20 +25,22 @@
 #include <linux/of_address.h>
 #include <linux/smp.h>
 
+#include <soc/qcom/cpu_pwr_ctl.h>
 #include <soc/qcom/scm-boot.h>
 #include <soc/qcom/socinfo.h>
+#include <soc/qcom/pm.h>
+#include <soc/qcom/spm.h>
+#include <soc/qcom/jtag.h>
 
 #include <asm/barrier.h>
 #include <asm/cacheflush.h>
 #include <asm/cpu_ops.h>
 #include <asm/cputype.h>
 #include <asm/smp_plat.h>
-#include <soc/qcom/pm.h>
-
-#define CPU_PWR_CTL_OFFSET		0x4
-#define CPU_PWR_GATE_CTL_OFFSET		0x14
 
 static DEFINE_RAW_SPINLOCK(boot_lock);
+
+DEFINE_PER_CPU(int, cold_boot_done);
 
 static int cold_boot_flags[] = {
 	0,
@@ -45,8 +48,6 @@ static int cold_boot_flags[] = {
 	SCM_FLAG_COLDBOOT_CPU2,
 	SCM_FLAG_COLDBOOT_CPU3,
 };
-
-DEFINE_PER_CPU(int, cold_boot_done);
 
 static void write_pen_release(u64 val)
 {
@@ -83,103 +84,6 @@ static int secondary_pen_release(unsigned int cpu)
 	raw_spin_unlock(&boot_lock);
 
 	return secondary_holding_pen_release != INVALID_HWID ? -ENOSYS : 0;
-}
-
-static int unclamp_secondary_sim(unsigned int cpu)
-{
-	int ret = 0;
-	struct device_node *cpu_node, *acc_node;
-	void __iomem *reg;
-
-	cpu_node = of_get_cpu_node(cpu, NULL);
-	if (!cpu_node) {
-		ret = -ENODEV;
-		goto out_acc;
-	}
-
-	acc_node = of_parse_phandle(cpu_node, "qcom,acc", 0);
-	if (!acc_node) {
-		ret = -ENODEV;
-		goto out_acc;
-	}
-
-	reg = of_iomap(acc_node, 0);
-	if (!reg) {
-		ret = -ENOMEM;
-		goto out_acc;
-	}
-
-	writel_relaxed(0x800, reg + CPU_PWR_CTL_OFFSET);
-	writel_relaxed(0x3FFF, reg + CPU_PWR_GATE_CTL_OFFSET);
-	mb();
-	iounmap(reg);
-
-out_acc:
-	of_node_put(cpu_node);
-
-	return ret;
-}
-
-static int unclamp_secondary_cpu(unsigned int cpu)
-{
-
-	int ret = 0;
-	struct device_node *cpu_node, *acc_node;
-	void __iomem *reg;
-
-	cpu_node = of_get_cpu_node(cpu, NULL);
-	if (!cpu_node)
-		return -ENODEV;
-
-	acc_node = of_parse_phandle(cpu_node, "qcom,acc", 0);
-	if (!acc_node) {
-			ret = -ENODEV;
-			goto out_acc;
-	}
-
-	reg = of_iomap(acc_node, 0);
-	if (!reg) {
-		ret = -ENOMEM;
-		goto out_acc;
-	}
-
-	/* Assert Reset on cpu-n */
-	writel_relaxed(0x00000033, reg + CPU_PWR_CTL_OFFSET);
-	mb();
-
-	/*Program skew to 16 X0 clock cycles*/
-	writel_relaxed(0x10000001, reg + CPU_PWR_GATE_CTL_OFFSET);
-	mb();
-	udelay(2);
-
-	/* De-assert coremem clamp */
-	writel_relaxed(0x00000031, reg + CPU_PWR_CTL_OFFSET);
-	mb();
-
-	/* Close coremem array gdhs */
-	writel_relaxed(0x00000039, reg + CPU_PWR_CTL_OFFSET);
-	mb();
-	udelay(2);
-
-	/* De-assert cpu-n clamp */
-	writel_relaxed(0x00020038, reg + CPU_PWR_CTL_OFFSET);
-	mb();
-	udelay(2);
-
-	/* De-assert cpu-n reset */
-	writel_relaxed(0x00020008, reg + CPU_PWR_CTL_OFFSET);
-	mb();
-
-	/* Assert PWRDUP signal on core-n */
-	writel_relaxed(0x00020088, reg + CPU_PWR_CTL_OFFSET);
-	mb();
-
-	/* Secondary CPU-N is now alive */
-	iounmap(reg);
-out_acc:
-	of_node_put(cpu_node);
-
-	return ret;
 }
 
 static int __init msm_cpu_init(struct device_node *dn, unsigned int cpu)
@@ -228,11 +132,11 @@ static int msm_cpu_boot(unsigned int cpu)
 
 	if (per_cpu(cold_boot_done, cpu) == false) {
 		if (of_board_is_sim()) {
-			ret = unclamp_secondary_sim(cpu);
+			ret = msm_unclamp_secondary_arm_cpu_sim(cpu);
 			if (ret)
 				return ret;
 		} else {
-			ret = unclamp_secondary_cpu(cpu);
+			ret = msm_unclamp_secondary_arm_cpu(cpu);
 			if (ret)
 				return ret;
 		}
@@ -262,10 +166,13 @@ static int msm8994_cpu_boot(unsigned int cpu)
 
 void msm_cpu_postboot(void)
 {
+	msm_jtag_restore_state();
 	/*
 	 * Let the primary processor know we're out of the pen.
 	 */
 	write_pen_release(INVALID_HWID);
+
+	msm_spm_set_low_power_mode(MSM_SPM_MODE_CLOCK_GATING, false);
 
 	/*
 	 * Synchronise with the boot thread.

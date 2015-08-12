@@ -740,13 +740,7 @@ BMM050_S16 *diff_z)
 		/* set sleep mode to prepare for forced measurement.
 		 * If sensor is off, this will turn it on
 		 * and respect needed delays. */
-		p_bmm050->delay_msec(100);
-		comres = bmm050_set_functional_state(BMM050_SUSPEND_MODE);
-
-		p_bmm050->delay_msec(20);
 		comres = bmm050_set_functional_state(BMM050_SLEEP_MODE);
-
-		p_bmm050->delay_msec(20);
 
 		/* set normal accuracy mode */
 		comres += bmm050_set_repetitions_Z(BMM050_LOWPOWER_REPZ);
@@ -764,7 +758,7 @@ BMM050_S16 *diff_z)
 				BMM050_ADVANCED_SELFTEST_POSITIVE);
 		comres += bmm050_set_functional_state(BMM050_FORCED_MODE);
 		/* wait for measurement to complete */
-		p_bmm050->delay_msec(5);
+		p_bmm050->delay_msec(4);
 
 		/* read result from positive field measurement */
 		comres += bmm050_read_mdataXYZ(&mdata);
@@ -775,7 +769,7 @@ BMM050_S16 *diff_z)
 		comres += bmm050_set_adv_selftest(
 				BMM050_ADVANCED_SELFTEST_NEGATIVE);
 		comres += bmm050_set_functional_state(BMM050_FORCED_MODE);
-		p_bmm050->delay_msec(5); /* wait for measurement to complete */
+		p_bmm050->delay_msec(4); /* wait for measurement to complete */
 
 		/* read result from negative field measurement */
 		comres += bmm050_read_mdataXYZ(&mdata);

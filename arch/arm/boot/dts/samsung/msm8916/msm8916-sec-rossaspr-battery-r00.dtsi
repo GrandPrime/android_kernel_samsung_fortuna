@@ -16,7 +16,7 @@
 		compatible = "samsung,sec-battery";
 		battery,vendor = "SDI SDI";
 		battery,charger_name = "rt5033-charger";
-		battery,fuelgauge_name = "sec-fuelgauge";
+		battery,fuelgauge_name = "rt5033-fuelgauge";
 		battery,technology = <2>; /* POWER_SUPPLY_TECHNOLOGY_LION */
 
 		battery,chip_vendor = "QCOM";
@@ -115,7 +115,7 @@
                                               3200  0     75  28  64  85
                                               3780  0     75  25  69  85
                                               3926  0     75  44  97  85
-                                              4218  0     150  241 84  85
+                                              4218  0     75  208 84  85
                                               3200  400   125 30  85  205
                                               3780  400   106 1   85  205
                                               3926  400   125 50  85  205
@@ -128,7 +128,7 @@
                                                 3200  0     75  28  64  85
                                                 3780  0     75  25  69  85
                                                 3926  0     75  44  97  85
-                                                4218  0     150  241 84  85
+                                                4218  0     75  208 84  85
                                                 3200  400   125 30  85  205
                                                 3780  400   106 1   85  205
                                                 3926  400   125 50  85  205

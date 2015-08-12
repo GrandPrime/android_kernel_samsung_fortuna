@@ -133,13 +133,13 @@ EXPORT_SYMBOL_GPL(SM5701_reg_update);
 void SM5701_test_read(struct i2c_client *client)
 {
 	u8 data = 0,reg = SM5701_INTMASK1;
+	char str[1000] = {0,};
 
-	pr_info("%s \n",__func__);
-	//INT1/2/3 is R/C, So except SM5701_INTERRUPT_1~3
 	for (reg = SM5701_INTMASK1; reg <= SM5701_FLEDCNTL6; reg++) {
-	    SM5701_reg_read(client, reg, &data);
-	    pr_info("read SM5701 addr : 0x%02x data : 0x%02x\n", reg, data);
+		SM5701_reg_read(client, reg, &data);
+		sprintf(str+strlen(str), "0x%x = 0x%02x, ", reg, data);
 	}
+	pr_info("%s: %s\n", __func__, str);
 }
 EXPORT_SYMBOL_GPL(SM5701_test_read);
 

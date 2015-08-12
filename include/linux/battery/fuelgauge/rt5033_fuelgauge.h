@@ -17,6 +17,8 @@
 
 #include <linux/i2c.h>
 #include <linux/mfd/rt5033.h>
+#include <linux/battery/sec_battery.h>
+#include <linux/of_gpio.h>
 
 #ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
@@ -169,5 +171,88 @@ struct sec_fg_info {
 #endif /* #ifdef CONFIG_DEBUG_FS */
 };
 
+struct sec_fuelgauge_reg_data {
+	u8 reg_addr;
+	u8 reg_data1;
+	u8 reg_data2;
+};
+
+struct sec_fuelgauge_info {
+	struct i2c_client		*client;
+	sec_battery_platform_data_t *pdata;
+	struct power_supply		psy_fg;
+	struct delayed_work isr_work;
+
+	int cable_type;
+	bool is_charging;
+
+	/* HW-dedicated fuel guage info structure
+	 * used in individual fuel gauge file only
+	 * (ex. dummy_fuelgauge.c)
+	 */
+	struct sec_fg_info	info;
+
+	bool is_fuel_alerted;
+	struct wake_lock fuel_alert_wake_lock;
+
+	unsigned int capacity_old;	/* only for atomic calculation */
+	unsigned int capacity_max;	/* only for dynamic calculation */
+
+	bool initial_update_of_soc;
+	struct mutex fg_lock;
+
+	/* register programming */
+	int reg_addr;
+	u8 reg_data[2];
+
+	int fg_irq;
+};
+
+bool sec_hal_fg_init(struct i2c_client *);
+bool sec_hal_fg_suspend(struct i2c_client *);
+bool sec_hal_fg_resume(struct i2c_client *);
+bool sec_hal_fg_fuelalert_init(struct i2c_client *, int);
+bool sec_hal_fg_is_fuelalerted(struct i2c_client *);
+bool sec_hal_fg_fuelalert_process(void *, bool);
+bool sec_hal_fg_full_charged(struct i2c_client *);
+bool sec_hal_fg_reset(struct i2c_client *);
+bool sec_hal_fg_get_property(struct i2c_client *,
+				enum power_supply_property,
+				union power_supply_propval *);
+bool sec_hal_fg_set_property(struct i2c_client *,
+				enum power_supply_property,
+				const union power_supply_propval *);
+
+ssize_t sec_hal_fg_show_attrs(struct device *dev,
+				const ptrdiff_t offset, char *buf);
+
+ssize_t sec_hal_fg_store_attrs(struct device *dev,
+				const ptrdiff_t offset,
+				const char *buf, size_t count);
+
+ssize_t sec_fg_show_attrs(struct device *dev,
+				struct device_attribute *attr, char *buf);
+
+ssize_t sec_fg_store_attrs(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count);
+
+#ifdef CONFIG_OF
+extern void board_fuelgauge_init(void *fuelgauge);
+extern bool sec_bat_check_jig_status(void);
+#endif
+
+#define SEC_FG_ATTR(_name)				\
+{							\
+	.attr = {.name = #_name, .mode = 0664},	\
+	.show = sec_fg_show_attrs,			\
+	.store = sec_fg_store_attrs,			\
+}
+
+enum {
+	FG_REG = 0,
+	FG_DATA,
+	FG_REGS,
+};
 
 #endif // RT5033_FUELGAUGE_H

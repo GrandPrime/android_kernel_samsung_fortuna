@@ -143,6 +143,8 @@ static int mmc_decode_csd(struct mmc_card *card)
 			csd->erase_size = UNSTUFF_BITS(resp, 39, 7) + 1;
 			csd->erase_size <<= csd->write_blkbits - 9;
 		}
+		if (csd->erase_size == 0)
+			return EINVAL;
 		break;
 	case 1:
 		/*
@@ -1157,15 +1159,16 @@ static void mmc_sd_detect(struct mmc_host *host)
 	BUG_ON(!host->card);
 
 #if	defined(CONFIG_SEC_HYBRID_TRAY)
-	if (host->ops->get_cd && host->ops->get_cd(host) == 0) { 
-		mmc_card_set_removed(host->card); 
-		mmc_claim_host(host); 
-		mmc_power_off(host); 
-		mmc_sd_remove(host); 
-		mmc_detach_bus(host); 
-		mmc_release_host(host); 
-		return; 
-	} 
+
+	if (host->ops->get_cd && host->ops->get_cd(host) == 0) {
+		mmc_card_set_removed(host->card);
+		mmc_claim_host(host);
+		mmc_power_off(host);
+		mmc_sd_remove(host);
+		mmc_detach_bus(host);
+		mmc_release_host(host);
+		return;
+	}
 #endif
 
 	mmc_rpm_hold(host, &host->card->dev);
@@ -1402,7 +1405,11 @@ int mmc_attach_sd(struct mmc_host *host)
 	 */
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
 	retries = 5;
-	while (retries) {
+	/*
+	 * Some bad cards may take a long time to init, give preference to
+	 * suspend in those cases.
+	 */
+	while (retries && !host->rescan_disable) {
 		err = mmc_sd_init_card(host, host->ocr, NULL);
 		if (err) {
 			retries--;
@@ -1420,6 +1427,9 @@ int mmc_attach_sd(struct mmc_host *host)
 		       mmc_hostname(host), err);
 		goto err;
 	}
+
+	if (host->rescan_disable)
+		goto err;
 #else
 	err = mmc_sd_init_card(host, host->ocr, NULL);
 	if (err)
@@ -1443,9 +1453,9 @@ remove_card:
 	mmc_claim_host(host);
 err:
 	mmc_detach_bus(host);
-
-	pr_err("%s: error %d whilst initialising SD card\n",
-		mmc_hostname(host), err);
+	if (err)
+		pr_err("%s: error %d whilst initialising SD card: rescan: %d\n",
+		       mmc_hostname(host), err, host->rescan_disable);
 
 	return err;
 }

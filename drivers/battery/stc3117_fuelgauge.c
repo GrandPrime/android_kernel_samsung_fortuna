@@ -950,9 +950,12 @@ static int STC31xx_Task(struct i2c_client *client, GasGauge_DataTypeDef *GG)
 #endif
 	int res, value;
 
+	BattData.Cnom = GG->Cnom;
 	BattData.Rsense = GG->Rsense;
 	BattData.Vmode = GG->Vmode;
 	BattData.Rint = GG->Rint;
+	BattData.CC_cnf = GG->CC_cnf;
+	BattData.VM_cnf = GG->VM_cnf;
 	BattData.Alm_SOC = GG->Alm_SOC;
 	BattData.Alm_Vbat = GG->Alm_Vbat;
 	BattData.RelaxThreshold = GG->RelaxCurrent;
@@ -1025,7 +1028,10 @@ static int STC31xx_Task(struct i2c_client *client, GasGauge_DataTypeDef *GG)
 #endif
 
 		/* if not running, restore STC3117 */
-		STC311x_Recover(client);
+		if((GG_Ram.reg.GG_Status == GG_RUNNING) ||  (GG_Ram.reg.GG_Status == GG_POWERDN))
+			STC311x_Recover(client); /* if RUNNING state, restore STC3117*/
+		else
+			STC311x_Startup(client);  /* if INIT state, initialize STC3117*/
 		GG_Ram.reg.GG_Status = GG_INIT;
 	}
 #endif
@@ -1557,8 +1563,7 @@ bool sec_hal_fg_get_property(struct i2c_client *client,
 		if (val->intval == SEC_FUELGAUGE_CAPACITY_TYPE_RAW)
 			val->intval = fuelgauge->info.batt_soc * 10;
 		else
-			val->intval = 500;//fuelgauge->info.batt_soc;  //REV00 HW stc3117 IC can not work ,so need to set the soc to 50 for temp
-			dev_info(&client->dev, "%s: POWER_SUPPLY_PROP_CAPACITY temp to set to 50 \n",__func__);
+			val->intval = fuelgauge->info.batt_soc;
 		break;
 
 	/* Battery Temperature */

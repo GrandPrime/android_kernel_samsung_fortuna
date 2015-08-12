@@ -32,7 +32,6 @@
 /* PPP cant work at SVS for panel res above qHD */
 #define SVS_MAX_PIXEL		(540 * 960)
 
-#define MDP_CORE_CLK_RATE	307200000
 #define KOFF_TIMEOUT msecs_to_jiffies(84)
 
 enum  {
@@ -51,8 +50,8 @@ enum {
 };
 
 enum {
-	MDP3_IOMMU_DOMAIN_UNSECURE,
 	MDP3_IOMMU_DOMAIN_SECURE,
+	MDP3_IOMMU_DOMAIN_UNSECURE,
 	MDP3_IOMMU_DOMAIN_MAX,
 };
 

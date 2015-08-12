@@ -1,4 +1,5 @@
-/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+/*
+ * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -267,6 +268,7 @@ static void __iomem *virt_dbgbase;
 #define OXILI_GFX3D_CBCR				0x59020
 #define OXILI_GMEM_CBCR					0x59024
 #define OXILI_AHB_CBCR					0x59028
+#define OXILI_TIMER_CBCR				0x59040
 #define CAMSS_TOP_AHB_CMD_RCGR				0x5A000
 #define BIMC_GFX_CBCR					0x31024
 #define BIMC_GPU_CBCR					0x31040
@@ -370,10 +372,21 @@ static void __iomem *virt_dbgbase;
 	},					\
 	.num_fmax = VDD_DIG_NUM
 
+#define VDD_DIG_FMAX_MAP4(l1, f1, l2, f2, l3, f3, l4, f4) \
+	.vdd_class = &vdd_dig, \
+	.fmax = (unsigned long[VDD_DIG_NUM]) {	\
+		[VDD_DIG_##l1] = (f1),		\
+		[VDD_DIG_##l2] = (f2),		\
+		[VDD_DIG_##l3] = (f3),		\
+		[VDD_DIG_##l4] = (f4),          \
+	},					\
+	.num_fmax = VDD_DIG_NUM
+
 enum vdd_dig_levels {
 	VDD_DIG_NONE,
 	VDD_DIG_LOW,
 	VDD_DIG_NOMINAL,
+	VDD_DIG_NOMINAL_PLUS,
 	VDD_DIG_HIGH,
 	VDD_DIG_NUM
 };
@@ -382,6 +395,7 @@ static int vdd_corner[] = {
 	RPM_REGULATOR_CORNER_NONE,		/* VDD_DIG_NONE */
 	RPM_REGULATOR_CORNER_SVS_SOC,		/* VDD_DIG_LOW */
 	RPM_REGULATOR_CORNER_NORMAL,		/* VDD_DIG_NOMINAL */
+	RPM_REGULATOR_CORNER_TURBO,		/* VDD_DIG_NOMINAL_PLUS */
 	RPM_REGULATOR_CORNER_SUPER_TURBO,	/* VDD_DIG_HIGH */
 };
 
@@ -464,7 +478,9 @@ static struct pll_clk a53ss_cci_pll = {
 };
 
 static struct pll_freq_tbl apcs_c0_pll_freq[] = {
-	F_APCS_PLL(998400000,  52, 0x0, 0x1, 0x0, 0x0, 0x0),
+	F_APCS_PLL( 998400000,  52, 0x0, 0x1, 0x0, 0x0, 0x0),
+	F_APCS_PLL(1113600000,  58, 0x0, 0x1, 0x0, 0x0, 0x0),
+	F_APCS_PLL(1209600000,  63, 0x0, 0x1, 0x0, 0x0, 0x0),
 };
 
 static struct pll_clk a53ss_c0_pll = {
@@ -508,10 +524,13 @@ static struct pll_freq_tbl apcs_c1_pll_freq[] = {
 	F_APCS_PLL( 998400000, 52, 0x0, 0x1, 0x0, 0x0, 0x0),
 	F_APCS_PLL(1036800000, 54, 0x0, 0x1, 0x0, 0x0, 0x0),
 	F_APCS_PLL(1113600000, 58, 0x0, 0x1, 0x0, 0x0, 0x0),
+	F_APCS_PLL(1209600000, 63, 0x0, 0x1, 0x0, 0x0, 0x0),
 	F_APCS_PLL(1190400000, 62, 0x0, 0x1, 0x0, 0x0, 0x0),
 	F_APCS_PLL(1267200000, 66, 0x0, 0x1, 0x0, 0x0, 0x0),
 	F_APCS_PLL(1344000000, 70, 0x0, 0x1, 0x0, 0x0, 0x0),
+	F_APCS_PLL(1363200000, 71, 0x0, 0x1, 0x0, 0x0, 0x0),
 	F_APCS_PLL(1420800000, 74, 0x0, 0x1, 0x0, 0x0, 0x0),
+	F_APCS_PLL(1459200000, 76, 0x0, 0x1, 0x0, 0x0, 0x0),
 	F_APCS_PLL(1497600000, 78, 0x0, 0x1, 0x0, 0x0, 0x0),
 	F_APCS_PLL(1536000000, 80, 0x0, 0x1, 0x0, 0x0, 0x0),
 	F_APCS_PLL(1574400000, 82, 0x0, 0x1, 0x0, 0x0, 0x0),
@@ -796,7 +815,7 @@ static struct rcg_clk vfe0_clk_src = {
 	.c = {
 		.dbg_name = "vfe0_clk_src",
 		.ops = &clk_ops_rcg,
-		VDD_DIG_FMAX_MAP3(LOW, 160000000, NOMINAL, 320000000, HIGH,
+		VDD_DIG_FMAX_MAP4(LOW, 200000000, NOMINAL, 400000000, NOMINAL_PLUS, 480000000, HIGH,
 			600000000),
 		CLK_INIT(vfe0_clk_src.c),
 	},
@@ -813,6 +832,7 @@ static struct clk_freq_tbl ftbl_gcc_oxili_gfx3d_clk[] = {
 	F( 266670000,      gpll0_out_main,   3,	  0,	0),
 	F( 310000000,	gpll2_gfx3d,	3,	  0,	0),
 	F( 400000000,      gpll0_out_main,   2,	  0,	0),
+	F( 465000000,      gpll2_gfx3d,   2,    0,    0),
 	F( 550000000,      gpll3_out_main,   2,    0,    0),
 	F_END
 };
@@ -826,7 +846,7 @@ static struct rcg_clk gfx3d_clk_src = {
 	.c = {
 		.dbg_name = "gfx3d_clk_src",
 		.ops = &clk_ops_rcg,
-		VDD_DIG_FMAX_MAP3(LOW, 220000000, NOMINAL, 400000000, HIGH,
+		VDD_DIG_FMAX_MAP4(LOW, 220000000, NOMINAL, 400000000, NOMINAL_PLUS, 465000000, HIGH,
 			550000000),
 		CLK_INIT(gfx3d_clk_src.c),
 	},
@@ -1142,6 +1162,7 @@ static struct rcg_clk jpeg0_clk_src = {
 
 static struct clk_freq_tbl ftbl_gcc_camss_mclk0_1_2_clk[] = {
 	F(  24000000,      gpll6_mclk,  1,   1,    45),
+	F(  26024000,      gpll6_mclk,  1,   2,    83),
 	F(  66670000,	   gpll0_out_main,  12,	  0,	0),
 	F_END
 };
@@ -1230,8 +1251,8 @@ static struct rcg_clk csi1phytimer_clk_src = {
 static struct clk_freq_tbl ftbl_gcc_camss_cpp_clk[] = {
 	F( 160000000,	   gpll0_out_main,   5,	  0,	0),
 	F( 200000000,      gpll0_out_main,   4,   0,    0),
-	F( 228500000,      gpll0_out_main, 3.5,   0,    0),
-	F( 266000000,      gpll0_out_main,   3,   0,    0),
+	F( 228570000,      gpll0_out_main, 3.5,   0,    0),
+	F( 266670000,      gpll0_out_main,   3,   0,    0),
 	F( 320000000,	   gpll0_out_main, 2.5,	  0,	0),
 	F( 465000000,	   gpll2_out_main,   2,	  0,	0),
 	F_END
@@ -1520,6 +1541,7 @@ static struct rcg_clk sdcc2_apps_clk_src = {
 static struct clk_freq_tbl ftbl_gcc_usb_hs_system_clk[] = {
 	F(  57140000,      gpll0_out_main,  14,    0,    0),
 	F(  80000000,	   gpll0_out_main,  10,	  0,	0),
+	F( 100000000,	   gpll0_out_main,   8,	  0,	0),
 	F_END
 };
 
@@ -1532,7 +1554,7 @@ static struct rcg_clk usb_hs_system_clk_src = {
 	.c = {
 		.dbg_name = "usb_hs_system_clk_src",
 		.ops = &clk_ops_rcg,
-		VDD_DIG_FMAX_MAP2(LOW, 57140000, NOMINAL, 80000000),
+		VDD_DIG_FMAX_MAP2(LOW, 57140000, NOMINAL, 100000000),
 		CLK_INIT(usb_hs_system_clk_src.c),
 	},
 };
@@ -2528,6 +2550,18 @@ static struct branch_clk gcc_oxili_gfx3d_clk = {
 	},
 };
 
+static struct branch_clk gcc_oxili_timer_clk = {
+	.cbcr_reg = OXILI_TIMER_CBCR,
+	.has_sibling = 0,
+	.base = &virt_bases[GCC_BASE],
+	.c = {
+		.dbg_name = "gcc_oxili_timer_clk",
+		.parent = &gcc_xo.c,
+		.ops = &clk_ops_branch,
+		CLK_INIT(gcc_oxili_timer_clk.c),
+	},
+};
+
 static struct branch_clk gcc_pdm2_clk = {
 	.cbcr_reg = PDM2_CBCR,
 	.has_sibling = 0,
@@ -3048,6 +3082,7 @@ static struct mux_clk gcc_debug_mux = {
 		{&gcc_crypto_clk.c,			0x0138},
 		{&gcc_crypto_axi_clk.c,			0x0139},
 		{&gcc_crypto_ahb_clk.c,			0x013a},
+		{&gcc_oxili_timer_clk.c,		0x01e9},
 		{&gcc_oxili_gfx3d_clk.c,		0x01ea},
 		{&gcc_oxili_ahb_clk.c,			0x01eb},
 		{&gcc_oxili_gmem_clk.c,			0x01f0},
@@ -3233,6 +3268,7 @@ static struct clk_lookup msm_clocks_lookup[] = {
 	CLK_LIST(gcc_mss_cfg_ahb_clk),
 	CLK_LIST(gcc_mss_q6_bimc_axi_clk),
 	CLK_LIST(gcc_oxili_ahb_clk),
+	CLK_LIST(gcc_oxili_timer_clk),
 	CLK_LIST(gcc_oxili_gfx3d_clk),
 	CLK_LIST(gcc_pdm2_clk),
 	CLK_LIST(gcc_pdm_ahb_clk),
@@ -3254,14 +3290,12 @@ static struct clk_lookup msm_clocks_lookup[] = {
 	CLK_LIST(gcc_bimc_gfx_clk),
 	CLK_LIST(gcc_bimc_gpu_clk),
 	CLK_LIST(wcnss_m_clk),
-};
 
-static struct clk_lookup msm_clocks_gcc_8936_crypto[] = {
 	/* Crypto clocks */
-	CLK_LOOKUP_OF("core_clk",     gcc_crypto_clk,      "scm"),
-	CLK_LOOKUP_OF("iface_clk",    gcc_crypto_ahb_clk,  "scm"),
-	CLK_LOOKUP_OF("bus_clk",      gcc_crypto_axi_clk,  "scm"),
-	CLK_LOOKUP_OF("core_clk_src", crypto_clk_src,      "scm"),
+	CLK_LIST(gcc_crypto_clk),
+	CLK_LIST(gcc_crypto_ahb_clk),
+	CLK_LIST(gcc_crypto_axi_clk),
+	CLK_LIST(crypto_clk_src),
 };
 
 /* Please note that the order of reg-names is important */
@@ -3304,10 +3338,14 @@ static int msm_gcc_probe(struct platform_device *pdev)
 	struct clk *tmp_clk;
 	int ret;
 	u32 regval;
+	bool compat_bin = false;
 
 	ret = get_memory(pdev);
 	if (ret)
 		return ret;
+
+	compat_bin = of_device_is_compatible(pdev->dev.of_node,
+						"qcom,gcc-8936-v3");
 
 	vdd_dig.regulator[0] = devm_regulator_get(&pdev->dev, "vdd_dig");
 	if (IS_ERR(vdd_dig.regulator[0])) {
@@ -3381,14 +3419,11 @@ static int msm_gcc_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	ret = of_msm_clock_register(pdev->dev.of_node,
-				 msm_clocks_gcc_8936_crypto,
-				 ARRAY_SIZE(msm_clocks_gcc_8936_crypto));
-	if (ret)
-		return ret;
-
 	clk_set_rate(&apss_ahb_clk_src.c, 19200000);
 	clk_prepare_enable(&apss_ahb_clk_src.c);
+
+	if (compat_bin)
+		gcc_bimc_gfx_clk.c.depends = NULL;
 
 	dev_info(&pdev->dev, "Registered GCC clocks\n");
 
@@ -3397,6 +3432,7 @@ static int msm_gcc_probe(struct platform_device *pdev)
 
 static struct of_device_id msm_clock_gcc_match_table[] = {
 	{ .compatible = "qcom,gcc-8936" },
+	{ .compatible = "qcom,gcc-8936-v3" },
 	{}
 };
 

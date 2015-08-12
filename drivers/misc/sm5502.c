@@ -123,7 +123,6 @@ extern int system_rev;
 #define DEV_AUDIO_1			(1 << 0)
 
 #define DEV_T1_USB_MASK		(DEV_USB_OTG | DEV_USB_CHG | DEV_USB)
-#define DEV_T1_UART_MASK	(DEV_UART)
 #define DEV_T1_CHARGER_MASK	(DEV_DEDICATED_CHG | DEV_CAR_KIT)
 #define DEV_CARKIT_CHARGER1_MASK	(1 << 1)
 #define MANSW1_OPEN_RUSTPROOF	((0x0 << 5) | (0x3 << 2) | (1 << 0))
@@ -263,7 +262,7 @@ static void sm5502_enable_rawdataInterrupts(struct sm5502_usbsw *usbsw)
 	u8 value, ret;
 
 	value = i2c_smbus_read_byte_data(client, REG_CONTROL);
-	value &= 0xF7;	/*Control Register Bit 4 set to 0 to enable RAW Data INTR*/
+	value &= 0xF7;	/* Control Register Bit 4 set to 0 to enable RAW Data INTR */
 
 	ret = i2c_smbus_write_byte_data(client, REG_CONTROL, value);
 	pr_info("%s:set CONTROL value to 0x%x\n", __func__, value);
@@ -278,7 +277,7 @@ static void sm5502_disable_rawdataInterrupts(struct sm5502_usbsw *usbsw)
 	int value, ret;
 
 	value = i2c_smbus_read_byte_data(client, REG_CONTROL);
-	value |= 0x08;  /*Control Register Bit 4 set to 0 to enable RAW Data INTR*/
+	value |= 0x08;  /* Control Register Bit 4 set to 0 to enable RAW Data INTR */
 
 	ret = i2c_smbus_write_byte_data(client, REG_CONTROL, value);
 	pr_info("%s:set CONTROL value to 0x%x \n", __func__, value);
@@ -308,36 +307,8 @@ static int sm5502_read_reg(struct i2c_client *client, int reg)
 	return ret;
 }
 
-static void sm5502_disable_interrupt(void)
-{
-	struct i2c_client *client = local_usbsw->client;
-	int value, ret;
-
-	value = i2c_smbus_read_byte_data(client, REG_CONTROL);
-	value |= CON_INT_MASK;
-
-	ret = i2c_smbus_write_byte_data(client, REG_CONTROL, value);
-	if (ret < 0)
-		dev_err(&client->dev, "%s: err %d\n", __func__, ret);
-
-}
-
-static void sm5502_enable_interrupt(void)
-{
-	struct i2c_client *client = local_usbsw->client;
-	int value, ret;
-
-	value = i2c_smbus_read_byte_data(client, REG_CONTROL);
-	value &= (~CON_INT_MASK);
-
-	ret = i2c_smbus_write_byte_data(client, REG_CONTROL, value);
-	if (ret < 0)
-		dev_err(&client->dev, "%s: err %d\n", __func__, ret);
-
-}
-
 #if defined(CONFIG_MUIC_SUPPORT_DESKDOCK) || defined(CONFIG_USB_HOST_NOTIFY) ||\
-    defined(CONFIG_SEC_FACTORY)
+    defined(CONFIG_MUIC_SUPPORT_SMARTDOCK)
 static void sm5502_dock_control(struct sm5502_usbsw *usbsw,
 	int dock_type, int state, int path)
 {
@@ -400,15 +371,15 @@ static void sm5502_reg_init(struct sm5502_usbsw *usbsw)
 	if (ret < 0)
 		dev_err(&client->dev, "%s: err %d\n", __func__, ret);
 	usbsw->mode = CON_MANUAL_SW;
-    /*set timing1 to 300ms */
+	/* set timing1 to 300ms */
 	ret = i2c_smbus_write_byte_data(client, REG_TIMING_SET1, 0x04);
-    if (ret < 0)
-        dev_err(&client->dev, "%s: err %d\n", __func__, ret);
-
-    /*Manual SW2 bit2 : JIG_ON '1' */
-    ret = i2c_smbus_write_byte_data(client, REG_MANUAL_SW2, 0x04);
-    if (ret < 0)
-        dev_err(&client->dev, "%s: err %d\n", __func__, ret);
+	if (ret < 0)
+		dev_err(&client->dev, "%s: err %d\n", __func__, ret);
+        /*Modify from supplier, to enble charge pump to enable the negative power supply.*/
+        /*IF not, to insert earphone and play mp3 with the maximum volume, messy code output UART.*/
+        ret = i2c_smbus_write_byte_data(client, REG_CHGPUMP_SET, 0x00);
+        if (ret < 0)
+            dev_err(&client->dev, "%s: err %d\n", __func__, ret);
 }
 
 static ssize_t sm5502_muic_show_attached_dev(struct device *dev,
@@ -443,6 +414,8 @@ static ssize_t sm5502_muic_show_attached_dev(struct device *dev,
 		return sprintf(buf, "JIG USB ON\n");
 	case ATTACHED_DEV_DESKDOCK_MUIC:
 		return sprintf(buf, "DESKDOCK\n");
+	case ATTACHED_DEV_SMARTDOCK_MUIC:
+		return sprintf(buf, "SMARTDOCK\n");
 	case ATTACHED_DEV_AUDIODOCK_MUIC:
 		return sprintf(buf, "AUDIODOCK\n");
 	default:
@@ -634,7 +607,7 @@ static ssize_t uart_en_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct sm5502_usbsw *usbsw = dev_get_drvdata(dev);
-	/*is_rustproof is false then UART can be enabled*/
+	/* is_rustproof is false then UART can be enabled */
 	return snprintf(buf, 4, "%d\n", !(usbsw->is_rustproof));
 }
 
@@ -668,7 +641,7 @@ static ssize_t uart_sel_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct sm5502_usbsw *usbsw = dev_get_drvdata(dev);
-	/*for sm5502 paths are always switch to AP*/
+	/* for sm5502 paths are always switch to AP */
 	if (usbsw->attached_dev != ATTACHED_DEV_NONE_MUIC)
 		return snprintf(buf, 4, "AP\n");
 	else
@@ -710,7 +683,8 @@ static DEVICE_ATTR(usb_sel, S_IRUGO | S_IWUSR ,
 
 static DEVICE_ATTR(control, S_IRUGO, sm5502_show_control, NULL);
 static DEVICE_ATTR(device_type, S_IRUGO, sm5502_show_device_type, NULL);
-static DEVICE_ATTR(switch, S_IRUGO | S_IWUSR, sm5502_show_manualsw, sm5502_set_manualsw);
+static DEVICE_ATTR(switch, S_IRUGO | S_IWUSR,
+		sm5502_show_manualsw, sm5502_set_manualsw);
 static DEVICE_ATTR(usb_state, S_IRUGO, sm5502_show_usb_state, NULL);
 static DEVICE_ATTR(adc, S_IRUGO, sm5502_show_adc, NULL);
 static DEVICE_ATTR(reset_switch, S_IWUSR | S_IWGRP, NULL, sm5502_reset);
@@ -738,14 +712,14 @@ static void sm5502_set_otg(struct sm5502_usbsw *usbsw, int state)
 		ret = i2c_smbus_write_byte_data(client, REG_MANUAL_SW1, 0x25);
 		if (ret < 0)
 			dev_info(&client->dev, "%s: err %d\n", __func__, ret);
-		/*Disconnecting the MUIC_ID & ITBP Pins*/
+		/* Disconnecting the MUIC_ID & ITBP Pins */
 		ret = i2c_smbus_write_byte_data(client, REG_MANUAL_SW2, 0x00);
 		if (ret < 0)
 			dev_info(&client->dev, "%s: err %d\n", __func__, ret);
 		ret = i2c_smbus_read_byte_data(client, REG_CONTROL);
 		if (ret < 0)
 			dev_info(&client->dev, "%s: err %d\n", __func__, ret);
-		ret = ret & 0xFB; /*Manual Connection S/W enable*/
+		ret = ret & 0xFB; /* Manual Connection S/W enable */
 		ret = i2c_smbus_write_byte_data(client, REG_CONTROL, ret);
 		if (ret < 0)
 			dev_info(&client->dev, "%s: err %d\n", __func__, ret);
@@ -760,23 +734,11 @@ static void sm5502_set_otg(struct sm5502_usbsw *usbsw, int state)
 		ret = i2c_smbus_read_byte_data(client, REG_CONTROL);
 		if (ret < 0)
 			dev_info(&client->dev, "%s: err %d\n", __func__, ret);
-		ret = ret | 0x04; /*Manual Connection S/W Disable*/
+		ret = ret | 0x04; /* Manual Connection S/W Disable */
 		ret = i2c_smbus_write_byte_data(client, REG_CONTROL, ret);
 		if (ret < 0)
 			dev_info(&client->dev, "%s: err %d\n", __func__, ret);
 	}
-}
-#endif
-
-#ifndef CONFIG_USB_NOTIFY_LAYER
-enum sec_otg_dummy_defines {
-	NOTIFY_HOST_MODE=1,
-	NOTIFY_TEST_MODE=3,
-};
-/* Dummy callback Function to handle the OTG Test case*/
-int get_usb_mode(void)
-{
-	return 1;
 }
 #endif
 
@@ -794,7 +756,6 @@ int check_sm5502_jig_state(void)
 }
 EXPORT_SYMBOL(check_sm5502_jig_state);
 
-
 #if defined(CONFIG_MUIC_SM5502_SUPPORT_LANHUB_TA)
 static void sm5502_set_lanhub(struct sm5502_usbsw *usbsw, int state)
 {
@@ -805,14 +766,14 @@ static void sm5502_set_lanhub(struct sm5502_usbsw *usbsw, int state)
 		ret = i2c_smbus_write_byte_data(client, REG_MANUAL_SW1, 0x25);
 		if (ret < 0)
 			dev_info(&client->dev, "%s: err %d\n", __func__, ret);
-		/* Disconnect the ITBP & MUIC_ID Pins */
+		/* Disconnecting the MUIC_ID & ITBP Pins */
 		ret = i2c_smbus_write_byte_data(client, REG_MANUAL_SW2, 0x00);
 		if (ret < 0)
 			dev_info(&client->dev, "%s: err %d\n", __func__, ret);
 		ret = i2c_smbus_read_byte_data(client, REG_CONTROL);
 		if (ret < 0)
 			dev_info(&client->dev, "%s: err %d\n", __func__, ret);
-		ret = ret & 0xFB; /*Manual Connection S/W enable*/
+		ret = ret & 0xFB; /* Manual Connection S/W enable */
 		ret = i2c_smbus_write_byte_data(client, REG_CONTROL, ret);
 		if (ret < 0)
 			dev_info(&client->dev, "%s: err %d\n", __func__, ret);
@@ -827,7 +788,7 @@ static void sm5502_set_lanhub(struct sm5502_usbsw *usbsw, int state)
 		ret = i2c_smbus_read_byte_data(client, REG_CONTROL);
 		if (ret < 0)
 			dev_info(&client->dev, "%s: err %d\n", __func__, ret);
-		ret = ret | 0x04; /*Manual Connection S/W enable*/
+		ret = ret | 0x04; /* Manual Connection S/W enable */
 		ret = i2c_smbus_write_byte_data(client, REG_CONTROL, ret);
 		if (ret < 0)
 			dev_info(&client->dev, "%s: err %d\n", __func__, ret);
@@ -838,20 +799,20 @@ static void sm5502_mask_vbus_detect(struct sm5502_usbsw *usbsw, int state)
 {
 	unsigned int value;
 	struct i2c_client *client = usbsw->client;
-	if(state == SM5502_ATTACHED) {
-		pr_info("%s called, state: (%d)\n",__func__,state);
-	/*Need to disable the vbus change interrupts*/
-		value = i2c_smbus_read_byte_data(client,REG_INT_MASK2);
+	if (state == SM5502_ATTACHED) {
+		pr_info("%s called, state: (%d)\n", __func__, state);
+	/* Need to disable the vbus change interrupts */
+		value = i2c_smbus_read_byte_data(client, REG_INT_MASK2);
 		if (value < 0)
 			dev_err(&client->dev, "%s: err %d\n", __func__, value);
 		value |= 0x01;
-		value = i2c_smbus_write_byte_data(client,REG_INT_MASK2,value);
+		value = i2c_smbus_write_byte_data(client, REG_INT_MASK2, value);
 		if (value < 0)
 			dev_err(&client->dev, "%s: err %d\n", __func__, value);
 	} else {
-		pr_info("%s called, state: (%d)\n",__func__,state);
+		pr_info("%s called, state: (%d)\n", __func__, state);
 
-		value = i2c_smbus_write_byte_data(client,REG_INT_MASK2,INT_MASK2);
+		value = i2c_smbus_write_byte_data(client, REG_INT_MASK2, INT_MASK2);
 		if (value < 0)
 			dev_err(&client->dev, "%s: err %d\n", __func__, value);
 	}
@@ -863,7 +824,7 @@ static int sm5502_detect_lanhub(struct sm5502_usbsw *usbsw)
 	unsigned int dev1, dev2, adc;
 	struct sm5502_platform_data *pdata = usbsw->pdata;
 	struct i2c_client *client = usbsw->client;
-	pr_info("%s called\n",__func__);
+	pr_info("%s called\n", __func__);
 
 	dev1 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE1);
 	if (dev1 < 0) {
@@ -883,22 +844,22 @@ static int sm5502_detect_lanhub(struct sm5502_usbsw *usbsw)
 	dev_info(&client->dev, "dev1: 0x%02x, dev2: 0x%02x, adc: 0x%02x\n",
 			dev1, dev2, adc);
 
-	/* Attached + Detached*/
-	switch(adc){
+	/* Attached + Detached */
+	switch (adc) {
 	case ADC_OTG:
 		lanhub_ta_case = false;
 		usbsw->adc = adc;
 		sm5502_set_otg(usbsw, SM5502_ATTACHED);
-		if(usbsw->previous_dock == SM5502_NONE) {
+		if (usbsw->previous_dock == SM5502_NONE) {
 			dev_info(&client->dev, "%s:LANHUB Connected\n", __func__);
 			pdata->callback(CABLE_TYPE_OTG, SM5502_ATTACHED);
-			sm5502_set_otg(usbsw,SM5502_ATTACHED);
+			sm5502_set_otg(usbsw, SM5502_ATTACHED);
 		} else if (usbsw->previous_dock == ADC_LANHUB) {
 			dev_info(&client->dev, "%s:Switch LANHUB+TA to LANHUB\n", __func__);
-			usbsw->lanhub_ta_status=0;
+			usbsw->lanhub_ta_status = 0;
 			pdata->lanhub_cb(CABLE_TYPE_LANHUB, SM5502_DETACHED, LANHUB_TA);
 		}
-		sm5502_mask_vbus_detect(usbsw,SM5502_DETACHED);
+		sm5502_mask_vbus_detect(usbsw, SM5502_DETACHED);
 		usbsw->dock_attached = SM5502_ATTACHED;
 		usbsw->previous_dock = ADC_OTG;
 		break;
@@ -906,13 +867,13 @@ static int sm5502_detect_lanhub(struct sm5502_usbsw *usbsw)
 		usbsw->adc = adc;
 		lanhub_ta_case = true;
 		usbsw->lanhub_ta_status = 1;
-		sm5502_mask_vbus_detect(usbsw,SM5502_ATTACHED);
+		sm5502_mask_vbus_detect(usbsw, SM5502_ATTACHED);
 		usbsw->dock_attached = SM5502_ATTACHED;
 		usbsw->mansw = SW_DHOST;
-		if(usbsw->previous_dock == SM5502_NONE) {
+		if (usbsw->previous_dock == SM5502_NONE) {
 			dev_info(&client->dev, "%s:LANHUB+TA Connected\n", __func__);
 			pdata->lanhub_cb(CABLE_TYPE_LANHUB, SM5502_ATTACHED, LANHUB);
-			sm5502_set_lanhub(usbsw,SM5502_ATTACHED);
+			sm5502_set_lanhub(usbsw, SM5502_ATTACHED);
 		} else if (usbsw->previous_dock == ADC_OTG) {
 			dev_info(&client->dev, "%s:Switch LANHUB to LANHUB+TA\n", __func__);
 			pdata->lanhub_cb(CABLE_TYPE_LANHUB, SM5502_ATTACHED, LANHUB_TA);
@@ -924,20 +885,20 @@ static int sm5502_detect_lanhub(struct sm5502_usbsw *usbsw)
 		dev_info(&client->dev, "%s:LANHUB + TA -> ADC_OPEN case\n", __func__);
 		if (pdata->lanhub_cb && usbsw->lanhub_ta_status == 1) {
 			if (usbsw->previous_dock == ADC_LANHUB)
-				pdata->lanhub_cb(CABLE_TYPE_LANHUB,SM5502_DETACHED, LANHUB);
+				pdata->lanhub_cb(CABLE_TYPE_LANHUB, SM5502_DETACHED, LANHUB);
 			sm5502_disable_rawdataInterrupts(usbsw);
-			usbsw->lanhub_ta_status=0;
-			sm5502_mask_vbus_detect(usbsw,SM5502_DETACHED);
-			pdata->callback(CABLE_TYPE_OTG,SM5502_DETACHED);
+			usbsw->lanhub_ta_status = 0;
+			sm5502_mask_vbus_detect(usbsw, SM5502_DETACHED);
+			pdata->callback(CABLE_TYPE_OTG, SM5502_DETACHED);
 			sm5502_set_otg(usbsw, SM5502_DETACHED);
 		} else if (usbsw->previous_dock == ADC_OTG) {
 			sm5502_disable_rawdataInterrupts(usbsw);
-			pdata->callback(CABLE_TYPE_OTG,SM5502_DETACHED);
+			pdata->callback(CABLE_TYPE_OTG, SM5502_DETACHED);
 			sm5502_set_otg(usbsw, SM5502_DETACHED);
-		}else {
+		} else {
 			dev_info(&client->dev, "%s:ignore ADC_OPEN case\n", __func__);
-				sm5502_mask_vbus_detect(usbsw,SM5502_DETACHED);
-			}
+				sm5502_mask_vbus_detect(usbsw, SM5502_DETACHED);
+		}
 
 		usbsw->previous_dock = SM5502_NONE;
 		lanhub_ta_case = false;
@@ -949,8 +910,8 @@ static int sm5502_detect_lanhub(struct sm5502_usbsw *usbsw)
 		break;
 	}
 
-	usbsw->dev1=dev1;
-	usbsw->dev2=dev2;
+	usbsw->dev1 = dev1;
+	usbsw->dev2 = dev2;
 	return adc;
 }
 #endif
@@ -963,6 +924,9 @@ static void muic_rustproof_feature(struct i2c_client *client, int state)
 			SW_ALL_OPEN_WITH_VBUS);
 		if (val < 0)
 			dev_info(&client->dev, "%s:MANUAL SW1,err %d\n", __func__, val);
+		val = i2c_smbus_write_byte_data(client, REG_MANUAL_SW2, 0x04);
+		if (val < 0)
+			dev_info(&client->dev, "%s: MANUAL SW2,err %d\n", __func__, val);
 		val = i2c_smbus_read_byte_data(client, REG_CONTROL);
 		if (val < 0)
 			dev_info(&client->dev, "%s:CTRL REG,err %d\n", __func__, val);
@@ -971,19 +935,19 @@ static void muic_rustproof_feature(struct i2c_client *client, int state)
 		if (val < 0)
 			dev_info(&client->dev, "%s:CTRL REG,err %d\n", __func__, val);
 	} else {
+		val = i2c_smbus_read_byte_data(client, REG_CONTROL);
+		if (val < 0)
+			dev_info(&client->dev, "%s: CTRL REG,err %d\n", __func__, val);
+		val = val | 0x04; /* Automatic Connection S/W enable */
+		val = i2c_smbus_write_byte_data(client, REG_CONTROL, val);
+		if (val < 0)
+			dev_info(&client->dev, "%s: CTRL REG,err %d\n", __func__, val);
 		val = i2c_smbus_write_byte_data(client, REG_MANUAL_SW2, 0x00);
 		if (val < 0)
 			dev_info(&client->dev, "%s: MANUAL SW2,err %d\n", __func__, val);
 		val = i2c_smbus_write_byte_data(client, REG_MANUAL_SW1, SW_ALL_OPEN);
 		if (val < 0)
 			dev_info(&client->dev, "%s: MANUAL SW1,err %d\n", __func__, val);
-		val = i2c_smbus_read_byte_data(client, REG_CONTROL);
-		if (val < 0)
-			dev_info(&client->dev, "%s: CTRL REG,err %d\n", __func__, val);
-		val = val | 0x04; /*Automatic Connection S/W enable*/
-		val = i2c_smbus_write_byte_data(client, REG_CONTROL, val);
-		if (val < 0)
-			dev_info(&client->dev, "%s: CTRL REG,err %d\n", __func__, val);
 	}
 }
 #endif
@@ -1002,6 +966,7 @@ static void muic_update_jig_state(struct sm5502_usbsw *usbsw, int dev_type2, int
 		usbsw->attached_dev = ATTACHED_DEV_JIG_USB_ON_MUIC;
 }
 
+
 static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 {
 	int adc;
@@ -1010,9 +975,8 @@ static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 	struct sm5502_platform_data *pdata = usbsw->pdata;
 	struct i2c_client *client = usbsw->client;
 #if defined(CONFIG_VIDEO_MHL_V2)
-	/*u8 mhl_ret = 0;*/
+	/* u8 mhl_ret = 0; */
 #endif
-
 	val1 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE1);
 	if (val1 < 0) {
 		dev_err(&client->dev, "%s: err %d\n", __func__, val1);
@@ -1041,7 +1005,7 @@ static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 	if (vbus < 0) {
 		dev_err(&client->dev, "%s: err %d\n", __func__, vbus);
 		return vbus;
-	}    
+	}
 
 	adc = i2c_smbus_read_byte_data(client, REG_ADC);
 #if !defined(CONFIG_USBID_STANDARD_VER_01)
@@ -1049,7 +1013,20 @@ static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 #if !defined(CONFIG_USB_HOST_NOTIFY)
 	case ADC_OTG:
 #endif
-	case (ADC_VZW_DOCK)...(ADC_MPOS):
+	case ADC_VZW_DOCK:
+	case ADC_VZW_INCOMPATIBLE:
+#if !defined(CONFIG_MUIC_SUPPORT_SMARTDOCK)
+	case ADC_SMART_DOCK:
+#endif
+	case ADC_HMT:
+#if !defined(CONFIG_USB_HOST_NOTIFY)
+	case ADC_AUDIO_DOCK:
+#endif
+	case ADC_LANHUB:
+#if !defined(CONFIG_MUIC_SUPPORT_CHARGING_CABLE)
+	case ADC_CHARGING_CABLE:
+#endif
+	case ADC_MPOS:
 #if !defined(CONFIG_MUIC_SUPPORT_DESKDOCK)
 	case ADC_DESKDOCK:
 #endif
@@ -1059,12 +1036,18 @@ static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 	}
 #endif
 #if defined(CONFIG_MUIC_SM5502_SUPPORT_LANHUB_TA)
-	else if (adc == ADC_LANHUB) {
+	if (adc == ADC_LANHUB) {
 		val2 = DEV_LANHUB;
 		val1 = 0;
 	}
 #endif
 
+#if defined(CONFIG_MUIC_SUPPORT_SMARTDOCK)
+	if (adc == ADC_SMART_DOCK) {
+		val2 = DEV_SMARTDOCK;
+		val1 = 0;
+	}
+#endif
 #if defined(CONFIG_USB_HOST_NOTIFY)
 	if (adc == 0x11 || adc == ADC_AUDIO_DOCK) {
 		val2 = DEV_AUDIO_DOCK;
@@ -1078,22 +1061,30 @@ static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 
 	/* USB */
 	if (val1 & DEV_USB || val2 & DEV_T2_USB_MASK) {
-		pr_info("[SM5502 MUIC] USB Connected\n");
-		pdata->callback(CABLE_TYPE_USB, SM5502_ATTACHED);
-		usbsw->attached_dev = ATTACHED_DEV_USB_MUIC;
+		if (vbus & DEV_VBUSIN_VALID) {
+			pr_info("[SM5502 MUIC] USB Connected\n");
+			pdata->callback(CABLE_TYPE_USB, SM5502_ATTACHED);
+			usbsw->attached_dev = ATTACHED_DEV_USB_MUIC;
+		} else {
+			pr_info("[SM5502 MUIC] USB Connected but not VBUS\n");
+		}
 	/* USB_CDP */
 	} else if (val1 & DEV_USB_CHG) {
 		pr_info("[MUIC] CDP Connected\n");
 		pdata->callback(CABLE_TYPE_CDP, SM5502_ATTACHED);
 		usbsw->attached_dev = ATTACHED_DEV_CDP_MUIC;
 	/* UART */
-	} else if (val1 & DEV_T1_UART_MASK || val2 & DEV_T2_UART_MASK) {
+	} else if (val2 & DEV_T2_UART_MASK) {
 		uart_sm5502_connecting = 1;
 		muic_update_jig_state(usbsw, val2, vbus);
 #if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
 		if (usbsw->is_rustproof) {
 			pr_info("[MUIC] RustProof mode, close UART Path\n");
 			muic_rustproof_feature(client, SM5502_ATTACHED);
+			if (vbus & DEV_VBUSIN_VALID)
+				pdata->callback(CABLE_TYPE_JIG_UART_OFF_VB, SM5502_ATTACHED);
+			else
+				pdata->callback(CABLE_TYPE_UARTOFF, SM5502_ATTACHED);
 		} else
 #endif
 		{
@@ -1144,23 +1135,34 @@ static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 		pr_info("[MUIC] Deskdock Connected\n");
 		usbsw->attached_dev = ATTACHED_DEV_DESKDOCK_MUIC;
 		local_usbsw->dock_attached = SM5502_ATTACHED;
-		if(vbus & DEV_VBUSIN_VALID)
+		if (vbus & DEV_VBUSIN_VALID)
 			sm5502_dock_control(usbsw, CABLE_TYPE_DESK_DOCK,
 				SM5502_ATTACHED, SW_AUDIO);
 		else
 			sm5502_dock_control(usbsw, CABLE_TYPE_DESK_DOCK_NO_VB,
 				SM5502_ATTACHED, SW_AUDIO);
 #endif
+#if defined(CONFIG_MUIC_SUPPORT_SMARTDOCK)
+	/* Smart Dock */
+	} else if (val2 & DEV_SMARTDOCK) {
+		pr_info("[MUIC] Smartdock Connected\n");
+		usbsw->attached_dev = ATTACHED_DEV_SMARTDOCK_MUIC;
+		local_usbsw->dock_attached = SM5502_ATTACHED;
+		if (vbus & DEV_VBUSIN_VALID)
+			sm5502_dock_control(usbsw, CABLE_TYPE_SMART_DOCK,
+				SM5502_ATTACHED, SW_AUDIO);
+		else
+			sm5502_dock_control(usbsw, CABLE_TYPE_SMART_DOCK_NO_VB,
+				SM5502_ATTACHED, SW_AUDIO);
+#endif
 #if defined(CONFIG_VIDEO_MHL_V2)
 	/* MHL */
 	} else if (val3 & DEV_MHL) {
 		pr_info("[MUIC] MHL Connected\n");
-		sm5502_disable_interrupt();
 		if (!poweroff_charging)
-			/*mhl_ret = mhl_onoff_ex(1); support from sii8240*/
+			/* mhl_ret = mhl_onoff_ex(1); support from sii8240 */
 		else
 			pr_info("LPM mode, skip MHL sequence\n");
-		sm5502_enable_interrupt();
 #endif
 	/* Car Dock */
 	} else if (val2 & DEV_JIG_UART_ON) {
@@ -1168,13 +1170,15 @@ static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 		muic_update_jig_state(usbsw, val2, vbus);
 #if defined(CONFIG_SEC_FACTORY)
 		local_usbsw->dock_attached = SM5502_ATTACHED;
-		sm5502_dock_control(usbsw, CABLE_TYPE_CARDOCK,
-			SM5502_ATTACHED, SW_AUDIO);
+		pdata->callback(CABLE_TYPE_CARDOCK, SM5502_ATTACHED);
 #elif defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
 		if (usbsw->is_rustproof) {
 			pr_info("[MUIC] RustProof mode, close UART Path\n");
 			muic_rustproof_feature(client, SM5502_ATTACHED);
 		}
+		pdata->callback(CABLE_TYPE_UARTON, SM5502_ATTACHED);
+#else
+		pdata->callback(CABLE_TYPE_UARTON, SM5502_ATTACHED);
 #endif
 #if defined(CONFIG_USB_HOST_NOTIFY)
 	/* Audio Dock */
@@ -1188,11 +1192,11 @@ static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 #if defined(CONFIG_MUIC_SM5502_SUPPORT_LANHUB_TA)
 		/* LANHUB */
 	} else if (val2 & DEV_LANHUB) {
-		if(usbsw->previous_dock == ADC_LANHUB &&
-			usbsw->lanhub_ta_status == 1 )
+		if (usbsw->previous_dock == ADC_LANHUB &&
+			usbsw->lanhub_ta_status == 1) {
 			/*Skip for the LANHUB+TA Case*/
 			pr_info("[MUIC] Lanhub + TA is connected\n");
-		else {
+		} else {
 		/* Enable RAWDATA Interrupts */
 		sm5502_enable_rawdataInterrupts(usbsw);
 		sm5502_detect_lanhub(usbsw);
@@ -1222,7 +1226,6 @@ static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 			SM5502_ATTACHED);
 		usbsw->undefined_attached = true;
 	}
-
 #if !defined(CONFIG_USBID_STANDARD_VER_01)
 attach_end:
 #endif
@@ -1230,7 +1233,7 @@ attach_end:
 	usbsw->dev2 = val2;
 	usbsw->dev3 = val3;
 	usbsw->adc = adc;
-	usbsw->vbus = vbus; 
+	usbsw->vbus = vbus;
 	usbsw->carkit_dev = val4;
 
 	return adc;
@@ -1242,6 +1245,7 @@ static int sm5502_detach_dev(struct sm5502_usbsw *usbsw)
 	pr_err("%s\n", __func__);
 	pr_err("dev1: 0x%x,dev2: 0x%x,chg_typ: 0x%x,vbus %d,ADC: 0x%x\n",
 			usbsw->dev1, usbsw->dev2, usbsw->dev3, usbsw->vbus, usbsw->adc);
+	jig_state = 0;
 #if !defined(CONFIG_USBID_STANDARD_VER_01)
 	switch (usbsw->adc) {
 #if !defined(CONFIG_USB_HOST_NOTIFY)
@@ -1265,12 +1269,15 @@ static int sm5502_detach_dev(struct sm5502_usbsw *usbsw)
 		pdata->callback(CABLE_TYPE_CDP, SM5502_DETACHED);
 
 	/* UART */
-	} else if (usbsw->dev1 & DEV_T1_UART_MASK ||
-			usbsw->dev2 & DEV_T2_UART_MASK) {
+	} else if (usbsw->dev2 & DEV_T2_UART_MASK) {
 #if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
 		if (usbsw->is_rustproof) {
 			pr_info("[MUIC] RustProof mode Disconnected Event\n");
 			muic_rustproof_feature(usbsw->client, SM5502_DETACHED);
+			if (usbsw->vbus & DEV_VBUSIN_VALID)
+				pdata->callback(CABLE_TYPE_JIG_UART_OFF_VB, SM5502_DETACHED);
+			else
+				pdata->callback(CABLE_TYPE_UARTOFF, SM5502_DETACHED);
 		} else
 #endif
 		{
@@ -1301,13 +1308,13 @@ static int sm5502_detach_dev(struct sm5502_usbsw *usbsw)
 					__func__, usbsw->lanhub_ta_status);
 		lanhub_ta_case = false;
 		if (usbsw->lanhub_ta_status == 0) {
-			pdata->callback(CABLE_TYPE_OTG,SM5502_DETACHED);
+			pdata->callback(CABLE_TYPE_OTG, SM5502_DETACHED);
 			sm5502_set_otg(usbsw, SM5502_DETACHED);
 		} else if (pdata->lanhub_cb && usbsw->lanhub_ta_status == 1) {
-			pdata->lanhub_cb(CABLE_TYPE_LANHUB,SM5502_DETACHED, LANHUB);
+			pdata->lanhub_cb(CABLE_TYPE_LANHUB, SM5502_DETACHED, LANHUB);
 		}
 		usbsw->dock_attached = SM5502_DETACHED;
-		usbsw->lanhub_ta_status=0;
+		usbsw->lanhub_ta_status = 0;
 #else
 		sm5502_set_otg(usbsw, SM5502_DETACHED);
 		pdata->callback(CABLE_TYPE_OTG, SM5502_DETACHED);
@@ -1323,11 +1330,23 @@ static int sm5502_detach_dev(struct sm5502_usbsw *usbsw)
 			(usbsw->dev3 & DEV_AV_VBUS)) {
 		pr_info("[MUIC] Deskdock Disconnected\n");
 		local_usbsw->dock_attached = SM5502_DETACHED;
-		if(usbsw->vbus & DEV_VBUSIN_VALID)
+		if (usbsw->vbus & DEV_VBUSIN_VALID)
 			sm5502_dock_control(usbsw, CABLE_TYPE_DESK_DOCK,
 				SM5502_DETACHED, SW_ALL_OPEN);
 		else
 			sm5502_dock_control(usbsw, CABLE_TYPE_DESK_DOCK_NO_VB,
+				SM5502_DETACHED, SW_ALL_OPEN);
+#endif
+#if defined(CONFIG_MUIC_SUPPORT_SMARTDOCK)
+	/* Smart Dock */
+	} else if (usbsw->dev2 & DEV_SMARTDOCK) {
+		pr_info("[MUIC] Smartdock Disconnected\n");
+		local_usbsw->dock_attached = SM5502_DETACHED;
+		if (usbsw->vbus & DEV_VBUSIN_VALID)
+			sm5502_dock_control(usbsw, CABLE_TYPE_SMART_DOCK,
+				SM5502_DETACHED, SW_ALL_OPEN);
+		else
+			sm5502_dock_control(usbsw, CABLE_TYPE_SMART_DOCK_NO_VB,
 				SM5502_DETACHED, SW_ALL_OPEN);
 #endif
 #if defined(CONFIG_MHL_D3_SUPPORT)
@@ -1341,13 +1360,15 @@ static int sm5502_detach_dev(struct sm5502_usbsw *usbsw)
 		pr_info("[MUIC] Cardock Disconnected\n");
 #if defined(CONFIG_SEC_FACTORY)
 		local_usbsw->dock_attached = SM5502_DETACHED;
-		sm5502_dock_control(usbsw, CABLE_TYPE_CARDOCK,
-			SM5502_DETACHED, SW_ALL_OPEN);
+		pdata->callback(CABLE_TYPE_CARDOCK, SM5502_DETACHED);
 #elif defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
 		if (usbsw->is_rustproof) {
 			pr_info("[MUIC] RustProof mode disconneted Event\n");
 			muic_rustproof_feature(usbsw->client, SM5502_DETACHED);
 		}
+		pdata->callback(CABLE_TYPE_UARTON, SM5502_DETACHED);
+#else
+		pdata->callback(CABLE_TYPE_UARTON, SM5502_DETACHED);
 #endif
 #if defined(CONFIG_USB_HOST_NOTIFY)
 	/* Audio Dock */
@@ -1364,16 +1385,17 @@ static int sm5502_detach_dev(struct sm5502_usbsw *usbsw)
 		sm5502_disable_rawdataInterrupts(usbsw);
 		lanhub_ta_case = false;
 		usbsw->dock_attached = SM5502_DETACHED;
-		sm5502_set_lanhub(usbsw,SM5502_DETACHED);
+		sm5502_set_lanhub(usbsw, SM5502_DETACHED);
 		sm5502_mask_vbus_detect(usbsw, SM5502_DETACHED);
-		pr_info("%s:lanhub_ta_status(%d)\n",__func__, usbsw->lanhub_ta_status);
-		if (pdata->lanhub_cb && usbsw->lanhub_ta_status==1)
+		pr_info("%s:lanhub_ta_status(%d)\n",
+			__func__, usbsw->lanhub_ta_status);
+		if (pdata->lanhub_cb && usbsw->lanhub_ta_status == 1) {
 			pdata->lanhub_cb(CABLE_TYPE_LANHUB, SM5502_DETACHED, LANHUB);
-		else if (usbsw->lanhub_ta_status == 0) {
+		} else if (usbsw->lanhub_ta_status == 0) {
 			pdata->callback(CABLE_TYPE_OTG, SM5502_DETACHED);
 			sm5502_set_otg(usbsw, SM5502_DETACHED);
 		}
-		usbsw->lanhub_ta_status=0;
+		usbsw->lanhub_ta_status = 0;
 		usbsw->dock_attached = SM5502_DETACHED;
 
 #endif
@@ -1397,12 +1419,12 @@ static int sm5502_detach_dev(struct sm5502_usbsw *usbsw)
 		pdata->callback(CABLE_TYPE_UNDEFINED,
 			SM5502_DETACHED);
 		usbsw->undefined_attached = false;
-    }
-
+	}
 #if !defined(CONFIG_USBID_STANDARD_VER_01)
 detach_end:
 #endif
 	i2c_smbus_write_byte_data(usbsw->client, REG_CONTROL, CON_MASK);
+	i2c_smbus_write_byte_data(usbsw->client, REG_MANUAL_SW2,0x00);
 
 	usbsw->dev1 = 0;
 	usbsw->dev2 = 0;
@@ -1427,14 +1449,12 @@ static irqreturn_t sm5502_irq_thread(int irq, void *data)
 	pr_info("sm5502_irq_thread is called\n");
 
 	mutex_lock(&usbsw->mutex);
-	sm5502_disable_interrupt();
 	intr1 = i2c_smbus_read_byte_data(client, REG_INT1);
 	intr2 = i2c_smbus_read_byte_data(client, REG_INT2);
-	sm5502_enable_interrupt();
 
 	adc = i2c_smbus_read_byte_data(client, REG_ADC);
 	dev_info(&client->dev, "%s: intr1 : 0x%x,intr2 : 0x%x, adc : 0x%x\n",
-					__func__, intr1, intr2,adc);
+					__func__, intr1, intr2, adc);
 
 	/* MUIC OVP Check */
 	if (intr1 & INT_OVP_ENABLE)
@@ -1443,7 +1463,7 @@ static irqreturn_t sm5502_irq_thread(int irq, void *data)
 		usbsw->pdata->oxp_callback(DISABLE);
 
 #if defined(CONFIG_MUIC_SM5502_SUPPORT_LANHUB_TA)
-	if((intr1 == 0x00 && (intr2 & 0x04))
+	if ((intr1 == 0x00 && (intr2 & 0x04))
 				|| ((intr1 & INT_DETACH) && (intr2 & 0x04)))
 		sm5502_detect_lanhub(usbsw);
 	else
@@ -1464,6 +1484,13 @@ static irqreturn_t sm5502_irq_thread(int irq, void *data)
 	} else if ((intr1 & INT_ATTACH) || (intr2 & INT_RESERVED_ATTACH) ||
 		(intr2 & INT_MHL)) {
 		sm5502_attach_dev(usbsw);
+	} else if (intr1 & INT_OXP_DISABLE) {
+		val1 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE1);
+		val3 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE3);
+		if ((adc == ADC_OPEN) && (val1 == DATA_NONE) && (val3 == DATA_NONE))
+			sm5502_detach_dev(usbsw);
+		else
+			sm5502_attach_dev(usbsw);
 	/* interrupt detach */
 	} else if (intr1 & INT_DETACH) {
 		sm5502_detach_dev(usbsw);
@@ -1471,12 +1498,19 @@ static irqreturn_t sm5502_irq_thread(int irq, void *data)
 		pr_info("sm5502: VBUSOUT_ON\n");
 #ifdef CONFIG_USB_HOST_NOTIFY
 		send_otg_notify(n, NOTIFY_EVENT_VBUSPOWER, 1);
-#endif
 		if (((adc != ADC_OPEN) && (adc != ADC_OTG)) &&
 			(get_usb_mode() != NOTIFY_TEST_MODE))
 			sm5502_attach_dev(usbsw);
 		else
 			goto irq_end;
+#else
+		if ((adc != ADC_OPEN) &&
+			(get_usb_mode() != NOTIFY_TEST_MODE)) {
+			sm5502_attach_dev(usbsw);
+		} else {
+			goto irq_end;
+		}
+#endif
 	} else if (intr2 == INT_VBUSOUT_OFF) {
 		pr_info("sm5502: VBUSOUT_OFF\n");
 #ifdef CONFIG_USB_HOST_NOTIFY
@@ -1484,7 +1518,11 @@ static irqreturn_t sm5502_irq_thread(int irq, void *data)
 #endif
 		if (get_usb_mode() != NOTIFY_TEST_MODE) {
 			/* When OVP occur, connecting cable */
-			if (intr1 != INT_OVP_ENABLE)
+			if (usbsw->attached_dev == ATTACHED_DEV_UNKNOWN_MUIC)
+				sm5502_detach_dev(usbsw);
+			else if	(adc != ADC_OPEN)
+				sm5502_attach_dev(usbsw);
+			else if (intr1 != INT_OVP_ENABLE) /* When OVP occur, connecting cable */
 				sm5502_detach_dev(usbsw);
 		} else {
 			goto irq_end;
@@ -1561,7 +1599,7 @@ static int sm5502_parse_dt(struct device *dev, struct sm5502_platform_data *pdat
 		0, &pdata->sda_gpio_flags);
 	pdata->gpio_int = of_get_named_gpio_flags(np, "sm5502,irq-gpio",
 		0, &pdata->irq_gpio_flags);
-	pr_info("%s: irq-gpio: %u \n", __func__, pdata->gpio_int);
+	pr_info("%s: irq-gpio: %u\n", __func__, pdata->gpio_int);
 
 	return 0;
 }
@@ -1577,12 +1615,12 @@ static int sm5502_probe(struct i2c_client *client,
 	struct sm5502_platform_data *pdata;
 	struct pinctrl *muic_pinctrl;
 
-	dev_info(&client->dev,"%s:sm5502 probe called \n",__func__);
-	if(client->dev.of_node) {
+	dev_info(&client->dev, "%s:sm5502 probe called\n", __func__);
+	if (client->dev.of_node) {
 		pdata = devm_kzalloc(&client->dev,
 			sizeof(struct sm5502_platform_data), GFP_KERNEL);
 		if (!pdata) {
-			dev_err(&client->dev, "Failed to allocate memory \n");
+			dev_err(&client->dev, "Failed to allocate memory\n");
 				return -ENOMEM;
 		}
 		ret = sm5502_parse_dt(&client->dev, pdata);
@@ -1786,6 +1824,14 @@ static int sm5502_suspend(struct device *dev)
 	struct sm5502_usbsw *usbsw = i2c_get_clientdata(client);
 	int ret;
 	pr_info("%s: suspend\n", __func__);
+	if (jig_state) {
+		/* set to JIG ON "1" */
+		ret = i2c_smbus_write_byte_data(client, REG_MANUAL_SW2,
+			0x04);
+		if (ret < 0)
+			dev_err(&client->dev, "%s: Write REG_MANUAL_SW2 err %d\n",
+				__func__, ret);
+	}
 	usbsw->mansw = i2c_smbus_read_byte_data(client, REG_MANUAL_SW1);
 	ret = i2c_smbus_write_byte_data(client, REG_MANUAL_SW1,
 		SW_ALL_OPEN_WITHOUT_VBUS);
@@ -1828,6 +1874,12 @@ static int sm5502_resume(struct device *dev)
 		if (ret < 0)
 			dev_err(&client->dev, "%s: write REG_CONTROL err %d\n",
 				__func__, ret);
+		/* set to JIG ON "0" */
+		ret = i2c_smbus_write_byte_data(client, REG_MANUAL_SW2,
+			0x00);
+		if (ret < 0)
+			dev_err(&client->dev, "%s: Write REG_MANUAL_SW2 err %d\n",
+				__func__, ret);
 	} else {
 		ret = i2c_smbus_write_byte_data(client, REG_MANUAL_SW1,
 			usbsw->mansw);
@@ -1838,32 +1890,28 @@ static int sm5502_resume(struct device *dev)
 #endif
 	intr = i2c_smbus_read_byte_data(client, REG_INT1);
 	i2c_smbus_read_byte_data(client, REG_INT2);
-
-    if (intr & INT_ATTACH){
-        intr_temp = i2c_smbus_read_byte_data(client, REG_INT1);
-        i2c_smbus_read_byte_data(client, REG_INT2);
-        if (intr_temp & INT_DETACH) {
-            intr &= 0xfe;
-        }
-        intr |= intr_temp;
-    }
+	if (intr & INT_ATTACH) {
+		intr_temp = i2c_smbus_read_byte_data(client, REG_INT1);
+		i2c_smbus_read_byte_data(client, REG_INT2);
+		if (intr_temp & INT_DETACH) {
+			intr &= 0xfe;
+		}
+		intr |= intr_temp;
+	}
 
 	ldev1 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE1);
-	if (ldev1 < 0)
-	{
-		pr_err("%s: Dev reg 1 read err! %d \n",__func__, ldev1);
+	if (ldev1 < 0) {
+		pr_err("%s: Dev reg 1 read err! %d\n", __func__, ldev1);
 		goto safe_exit;
 	}
 	ldev2 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE2);
-	if (ldev2 < 0)
-	{
-		pr_err("%s: Dev reg 2 read err! %d \n",__func__, ldev2);
+	if (ldev2 < 0) {
+		pr_err("%s: Dev reg 2 read err! %d\n", __func__, ldev2);
 		goto safe_exit;
 	}
 	ldev3 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE3);
-	if (ldev3 < 0)
-	{
-		pr_err("%s: Dev reg 3 read err! %d \n",__func__, ldev3);
+	if (ldev3 < 0) {
+		pr_err("%s: Dev reg 3 read err! %d\n", __func__, ldev3);
 		goto safe_exit;
 	}
 
@@ -1920,7 +1968,7 @@ static int __init sm5502_init(void)
 /*
 Late init call is required MUIC was accessing
 USB driver before USB initialization and watch dog reset
-was happening when booted with USB connected*/
+was happening when booted with USB connected */
 late_initcall(sm5502_init);
 
 static void __exit sm5502_exit(void)

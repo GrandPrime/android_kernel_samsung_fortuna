@@ -18,7 +18,6 @@
 #ifndef _LINUX_NET_H
 #define _LINUX_NET_H
 
-#include <linux/sched.h>
 #include <linux/stringify.h>
 #include <linux/random.h>
 #include <linux/wait.h>
@@ -115,10 +114,6 @@ struct socket {
 
 	struct file		*file;
 	struct sock		*sk;
-#ifdef CONFIG_KNOX_VPN_UID_PID
-	uid_t			knox_uid;
-	pid_t			knox_pid;
-#endif  /* CONFIG_KNOX_VPN_UID_PID */
 	const struct proto_ops	*ops;
 };
 

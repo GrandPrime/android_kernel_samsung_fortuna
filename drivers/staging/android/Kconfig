@@ -161,8 +161,6 @@ config ONESHOT_SYNC_USER
 	help
 	  Provide a userspace API for creating oneshot sync objects.
 
-source "drivers/staging/android/ion/Kconfig"
-
 config RUNTIME_COMPCACHE
 	bool "Android rtcc v3"
 	depends on ZRAM && ANDROID
@@ -177,15 +175,8 @@ config KSWAPD_NOSWAP
 	help
 	  This option controls swap action in kswapd
 
-config ANDROID_ALARM_OLDDRV_COMPAT
-	bool "Android Alarm compatability with old drivers"
-	depends on ANDROID_INTF_ALARM
-	default n
-	help
-	  Provides preprocessor alias to aid compatability with
-	  older out-of-tree drivers that use the Android Alarm
-	  in-kernel API. This will be removed eventually.
-	  
+source "drivers/staging/android/ion/Kconfig"
+
 source "drivers/staging/android/fiq_debugger/Kconfig"
 
 endif # if ANDROID

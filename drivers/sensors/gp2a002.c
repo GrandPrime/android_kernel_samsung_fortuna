@@ -37,8 +37,8 @@
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 
-#include "sensors_core.h"
-#include "gp2a002.h"
+#include <linux/types.h>
+#include <linux/sensor/sensors_core.h>
 
 #define REGS_PROX		0x0 /* Read  Only */
 #define REGS_GAIN		0x1 /* Write Only */
@@ -47,25 +47,47 @@
 #define REGS_OPMOD		0x4 /* Write Only */
 #define REGS_CON		0x6 /* Write Only */
 
-#if defined(CONFIG_SEC_FORTUNA_PROJECT) || defined(CONFIG_MACH_ROSSA_AIO)
-#define PROX_NONDETECT			0x40
-#define PROX_DETECT				0x20
-#elif defined(CONFIG_MACH_ROSSA_EUR_OPEN)
-#define PROX_NONDETECT			0x2F
-#define PROX_DETECT				0x0D
-#else
-#define PROX_NONDETECT			0x2F
-#define PROX_DETECT				0x0F
-#endif
+#if defined(CONFIG_SENSORS_BMA2X2_MODE_A)
+#define PROX_NONDETECT		0xC2
+#define PROX_DETECT		0xC2
+#define PROX_NONDETECT_MODE1	0xC8
+#define PROX_DETECT_MODE1	0xC8
+#define PROX_NONDETECT_MODE2	0xCB
+#define PROX_DETECT_MODE2	0xCB
+#elif defined(CONFIG_SENSORS_BMA2X2_MODE_B1)
+#define PROX_NONDETECT		0x40
+#define PROX_DETECT		0x20
 #define PROX_NONDETECT_MODE1	0x43
-#define PROX_DETECT_MODE1		0x28
+#define PROX_DETECT_MODE1	0x28
 #define PROX_NONDETECT_MODE2	0x48
-#define PROX_DETECT_MODE2		0x42
-#define OFFSET_FILE_PATH		"/efs/prox_cal"
+#define PROX_DETECT_MODE2	0x42
+#elif defined(CONFIG_SENSORS_PROX_NEWMODE2)
+#define PROX_NONDETECT		0x2F
+#define PROX_DETECT		0x0D
+#define PROX_NONDETECT_MODE1	0x43
+#define PROX_DETECT_MODE1	0x28
+#define PROX_NONDETECT_MODE2	0x48
+#define PROX_DETECT_MODE2	0x42
+#else
+#define PROX_NONDETECT		0x2F
+#define PROX_DETECT		0x0F
+#define PROX_NONDETECT_MODE1	0x41
+#define PROX_DETECT_MODE1	0x2E
+#define PROX_NONDETECT_MODE2	0x4E
+#define PROX_DETECT_MODE2	0x2B
+#endif
+#define OFFSET_FILE_PATH		"/efs/FactoryApp/prox_cal"
 
 #define PROXIMITY	1
 #define CHIP_DEV_NAME	"GP2AP002"
 #define CHIP_DEV_VENDOR	"SHARP"
+
+struct gp2a_data;
+
+struct gp2a_platform_data {
+	int p_out;
+	int power_en;
+};
 
 struct gp2a_data {
 	struct input_dev *input;
@@ -163,10 +185,6 @@ static int gp2a_leda_onoff(struct gp2a_data *gp2a, int power)
 
 	if (ret < 0)
 		pr_err("%s, error for direction\n", __func__);
-
-#if defined(CONFIG_MACH_ROSSA_SPR)
-	mdelay(2);
-#endif
 
 	return 0;
 }
@@ -363,8 +381,8 @@ static struct device_attribute *proxi_attrs[] = {
 };
 static int gp2a_regulator_onoff(struct device *dev, bool onoff)
 {
-   struct regulator *gp2a_vio;
-   struct regulator *gp2a_vdd;
+	struct regulator *gp2a_vio;
+	struct regulator *gp2a_vdd;
 	int ret;
 
 	pr_info("%s %s\n", __func__, (onoff) ? "on" : "off");
@@ -383,12 +401,14 @@ static int gp2a_regulator_onoff(struct device *dev, bool onoff)
 	if (onoff) {
 		ret = regulator_enable(gp2a_vdd);
 		if (ret) {
-			pr_err("%s: enable gp2a_vdd failed, rc=%d\n",__func__, ret);
+			pr_err("%s: enable gp2a_vdd failed, rc=%d\n",
+				__func__, ret);
 			return ret;
 		}
 		ret = regulator_enable(gp2a_vio);
 		if (ret) {
-			pr_err("%s: enable gp2a_vio failed, rc=%d\n",__func__, ret);
+			pr_err("%s: enable gp2a_vio failed, rc=%d\n",
+				__func__, ret);
 			return ret;
 		}
 	} else {

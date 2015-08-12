@@ -21,6 +21,13 @@
 #ifndef _MUIC_H_
 #define _MUIC_H_
 
+#ifndef CONFIG_USB_NOTIFY_LAYER
+enum sec_otg_dummy_defines {
+	NOTIFY_HOST_MODE = 1,
+	NOTIFY_TEST_MODE = 3,
+};
+extern int get_usb_mode(void);
+#endif
 enum cable_type_t {
         CABLE_TYPE_NONE = 0,
         CABLE_TYPE_USB,
@@ -28,10 +35,12 @@ enum cable_type_t {
         CABLE_TYPE_MISC,
         CABLE_TYPE_CARDOCK,
         CABLE_TYPE_UARTOFF,
+	CABLE_TYPE_UARTON,
         CABLE_TYPE_JIG,
         CABLE_TYPE_UNKNOWN,
         CABLE_TYPE_CDP,
         CABLE_TYPE_SMART_DOCK,
+	CABLE_TYPE_SMART_DOCK_NO_VB,
         CABLE_TYPE_OTG,
         CABLE_TYPE_AUDIO_DOCK,
 #ifdef CONFIG_WIRELESS_CHARGING
@@ -57,6 +66,7 @@ enum muic_attached_dev {
     ATTACHED_DEV_LANHUB_MUIC,
     ATTACHED_DEV_TA_MUIC,
     ATTACHED_DEV_DESKDOCK_MUIC,
+	ATTACHED_DEV_SMARTDOCK_MUIC,
     ATTACHED_DEV_CARDOCK_MUIC,
     ATTACHED_DEV_AUDIODOCK_MUIC,
     ATTACHED_DEV_JIG_UART_OFF_MUIC,

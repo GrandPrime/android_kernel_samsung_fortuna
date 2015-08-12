@@ -19,14 +19,42 @@
 
 #ifdef __KERNEL__
 
-#define SEC_SYSFS_FOR_FACTORY_TEST
-//#define SEC_USE_SOC_JACK_API 
-
 enum {
 	SEC_JACK_NO_DEVICE				= 0x0,
 	SEC_HEADSET_4POLE				= 0x01 << 0,
 	SEC_HEADSET_3POLE				= 0x01 << 1,
 };
+
+#ifdef CONFIG_DYNAMIC_MICBIAS_CONTROL
+enum micb_voltage {
+	MIC_BIAS_V1P60V = 0,
+	MIC_BIAS_V1P65V,
+	MIC_BIAS_V1P70V,
+	MIC_BIAS_V1P75V,
+	MIC_BIAS_V1P80V,
+	MIC_BIAS_V1P85V,
+	MIC_BIAS_V1P90V,
+	MIC_BIAS_V1P95V,
+	MIC_BIAS_V2P00V,
+	MIC_BIAS_V2P05V,
+	MIC_BIAS_V2P10V,
+	MIC_BIAS_V2P15V,
+	MIC_BIAS_V2P20V,
+	MIC_BIAS_V2P25V,
+	MIC_BIAS_V2P30V,
+	MIC_BIAS_V2P35V,
+	MIC_BIAS_V2P40V,
+	MIC_BIAS_V2P45V,
+	MIC_BIAS_V2P50V,
+	MIC_BIAS_V2P55V,
+	MIC_BIAS_V2P60V,
+	MIC_BIAS_V2P65V,
+	MIC_BIAS_V2P70V,
+	MIC_BIAS_V2P75V,
+	MIC_BIAS_V2P80V,
+	MIC_BIAS_V2P85V
+};
+#endif
 
 struct sec_jack_zone {
 	unsigned int adc_high;
@@ -46,20 +74,31 @@ struct sec_jack_platform_data {
 	int	send_end_gpio;
 	int	ear_micbias_gpio;
 	int	fsa_en_gpio;
+	int	det_en_gpio;
 	bool	det_active_high;
 	bool	send_end_active_high;
 	struct qpnp_vadc_chip		*vadc_dev;
 	struct sec_jack_zone jack_zones[4];
-	struct sec_jack_buttons_zone jack_buttons_zones[3];
+	struct sec_jack_buttons_zone jack_buttons_zones[4];
 	int mpp_ch_scale[3];
 	struct pinctrl *jack_pinctrl;
+	int btn_adc_read_count;
+#ifdef CONFIG_DYNAMIC_MICBIAS_CONTROL
+	int dynamic_micb_ctrl_voltage;
+#endif
 };
 
 #if defined (SEC_USE_SOC_JACK_API)
 #define SEC_JACK_BUTTON_MASK (SND_JACK_BTN_0 | SND_JACK_BTN_1 | SND_JACK_BTN_2)
+extern int sec_jack_soc_init(struct snd_soc_card *card);
 #endif
 
-extern int sec_jack_soc_init(struct snd_soc_card *card);
+#ifdef CONFIG_DYNAMIC_MICBIAS_CONTROL
+/* Dynamic Control Ear Mic Bias of WCD Codec */
+extern void msm8x16_wcd_dynamic_control_micbias(int voltage);
+extern int set_dynamic_micb_ctrl_voltage(int voltage);
+extern int is_mic_enable(void);
+#endif
 
 #endif
 

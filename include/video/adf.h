@@ -373,6 +373,7 @@ struct adf_interface {
 
 	enum adf_interface_type type;
 	u32 idx;
+	u32 flags;
 
 	wait_queue_head_t vsync_wait;
 	ktime_t vsync_timestamp;
@@ -423,9 +424,10 @@ int __printf(4, 5) adf_device_init(struct adf_device *dev,
 		struct device *parent, const struct adf_device_ops *ops,
 		const char *fmt, ...);
 void adf_device_destroy(struct adf_device *dev);
-int __printf(6, 7) adf_interface_init(struct adf_interface *intf,
+int __printf(7, 8) adf_interface_init(struct adf_interface *intf,
 		struct adf_device *dev, enum adf_interface_type type, u32 idx,
-		const struct adf_interface_ops *ops, const char *fmt, ...);
+		u32 flags, const struct adf_interface_ops *ops, const char *fmt,
+		...);
 void adf_interface_destroy(struct adf_interface *intf);
 static inline struct adf_device *adf_interface_parent(
 		struct adf_interface *intf)
@@ -451,6 +453,27 @@ const char *adf_event_type_str(struct adf_obj *obj, enum adf_event_type type);
 
 #define ADF_FORMAT_STR_SIZE 5
 void adf_format_str(u32 format, char buf[ADF_FORMAT_STR_SIZE]);
+int adf_format_validate_yuv(struct adf_device *dev, struct adf_buffer *buf,
+		u8 num_planes, u8 hsub, u8 vsub, u8 cpp[]);
+/**
+ * adf_format_validate_rgb - validate the number and size of planes in buffers
+ * with a custom RGB format.
+ *
+ * @dev: ADF device performing the validation
+ * @buf: buffer to validate
+ * @cpp: expected bytes per pixel
+ *
+ * adf_format_validate_rgb() is intended to be called as a helper from @dev's
+ * validate_custom_format() op.  @buf must have a single RGB plane.
+ *
+ * Returns 0 if @buf has a single plane with sufficient size, or -EINVAL
+ * otherwise.
+ */
+static inline int adf_format_validate_rgb(struct adf_device *dev,
+		struct adf_buffer *buf, u8 cpp)
+{
+	return adf_format_validate_yuv(dev, buf, 1, 1, 1, &cpp);
+}
 
 int adf_event_get(struct adf_obj *obj, enum adf_event_type type);
 int adf_event_put(struct adf_obj *obj, enum adf_event_type type);
@@ -472,5 +495,8 @@ void adf_vsync_notify(struct adf_interface *intf, ktime_t timestamp);
 int adf_hotplug_notify_connected(struct adf_interface *intf,
 		struct drm_mode_modeinfo *modelist, size_t n_modes);
 void adf_hotplug_notify_disconnected(struct adf_interface *intf);
+
+void adf_modeinfo_set_name(struct drm_mode_modeinfo *mode);
+void adf_modeinfo_set_vrefresh(struct drm_mode_modeinfo *mode);
 
 #endif /* _VIDEO_ADF_H */

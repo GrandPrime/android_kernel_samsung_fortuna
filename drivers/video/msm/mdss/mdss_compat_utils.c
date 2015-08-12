@@ -868,7 +868,7 @@ static int __from_user_lut_cfg_data(
 			struct mdp_lut_cfg_data __user *lut_cfg)
 {
 	uint32_t lut_type;
-	int ret;
+	int ret = 0;
 
 	if (copy_from_user(&lut_type, &lut_cfg32->lut_type,
 			sizeof(uint32_t)))
@@ -2242,7 +2242,7 @@ static int __from_user_hist_data(
 			sizeof(uint32_t)) ||
 	    copy_in_user(&hist_data->bin_cnt,
 			&hist_data32->bin_cnt,
-			sizeof(uint8_t)))
+			sizeof(uint32_t)))
 		return -EFAULT;
 
 	if (get_user(data, &hist_data32->c0) ||
@@ -2269,7 +2269,7 @@ static int __to_user_hist_data(
 			sizeof(uint32_t)) ||
 	    copy_in_user(&hist_data32->bin_cnt,
 			&hist_data->bin_cnt,
-			sizeof(uint8_t)))
+			sizeof(uint32_t)))
 		return -EFAULT;
 
 	if (get_user(data, (unsigned long *) &hist_data->c0) ||
@@ -2385,6 +2385,11 @@ static int __to_user_mdp_overlay(struct mdp_overlay32 __user *ov32,
 			   sizeof(struct mdp_scale_data));
 	if (ret)
 		return -EFAULT;
+
+	ret |= put_user(ov->color_space, &ov32->color_space);
+	if (ret)
+		return -EFAULT;
+
 	return 0;
 }
 
@@ -2439,6 +2444,10 @@ static int __from_user_mdp_overlay(struct mdp_overlay *ov,
 
 	if (copy_in_user(&ov->scale, &ov32->scale,
 			 sizeof(struct mdp_scale_data)))
+		return -EFAULT;
+
+	if (get_user(data, &ov32->color_space) ||
+	    put_user(data, &ov->color_space))
 		return -EFAULT;
 
 	return 0;
@@ -2568,6 +2577,7 @@ int mdss_compat_overlay_ioctl(struct fb_info *info, unsigned int cmd,
 	struct mdp_overlay_list32 __user *ovlist32;
 	size_t layers_refs_sz, layers_sz, prepare_sz;
 	void __user *total_mem_chunk;
+	uint32_t num_overlays;
 	int ret;
 
 	if (!info || !info->par)
@@ -2630,12 +2640,6 @@ int mdss_compat_overlay_ioctl(struct fb_info *info, unsigned int cmd,
 		prepare_sz = sizeof(struct mdp_overlay_list);
 		layers_refs_sz = num_overlays * sizeof(struct mdp_overlay *);
 
-		layers_sz = ovlist32->num_overlays *
-					sizeof(struct mdp_overlay);
-		prepare_sz = sizeof(struct mdp_overlay_list);
-		layers_refs_sz = ovlist32->num_overlays *
-					sizeof(struct mdp_overlay *);
-
 		total_mem_chunk = compat_alloc_user_space(
 			prepare_sz + layers_refs_sz + layers_sz);
 		if (!total_mem_chunk) {
@@ -2647,7 +2651,7 @@ int mdss_compat_overlay_ioctl(struct fb_info *info, unsigned int cmd,
 
 		layers_head = total_mem_chunk + prepare_sz;
 		mdss_compat_align_list(total_mem_chunk, layers_head,
-					ovlist32->num_overlays);
+					num_overlays);
 		ovlist = (struct mdp_overlay_list *)total_mem_chunk;
 
 		ret = __from_user_mdp_overlaylist(ovlist, ovlist32,
@@ -2657,8 +2661,9 @@ int mdss_compat_overlay_ioctl(struct fb_info *info, unsigned int cmd,
 		} else {
 			ret = mdss_fb_do_ioctl(info, cmd,
 						(unsigned long) ovlist);
-			ret = __to_user_mdp_overlaylist(ovlist32, ovlist,
-						layers_head);
+			if (!ret)
+				ret = __to_user_mdp_overlaylist(ovlist32,
+							 ovlist, layers_head);
 		}
 		break;
 	case MSMFB_OVERLAY_UNSET:
@@ -2735,7 +2740,7 @@ int mdss_fb_compat_ioctl(struct fb_info *info, unsigned int cmd,
 	if (ret == -ENOSYS)
 		pr_err("%s: unsupported ioctl\n", __func__);
 	else if (ret)
-		pr_err("%s: ioctl err cmd=%u ret=%d\n", __func__, cmd, ret);
+		pr_debug("%s: ioctl err cmd=%u ret=%d\n", __func__, cmd, ret);
 
 	return ret;
 }

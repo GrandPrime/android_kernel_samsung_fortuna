@@ -47,7 +47,7 @@
 #define MAX_TRY_I2C_READ	10
 #define I2C_ADDR_READ_L		0x51
 #define I2C_ADDR_READ_H		0x57
-#define NFC_DEBUG	0
+#define NFC_DEBUG 0
 
 struct pn547_dev {
 	wait_queue_head_t read_wq;
@@ -332,51 +332,8 @@ static const struct file_operations pn547_dev_fops = {
 	.open = pn547_dev_open,
 	.unlocked_ioctl = pn547_dev_ioctl,
 };
-/*
-static void nfc_power_onoff(int en)
-{
-	int rc;
-	static struct regulator* ldo14;
-	static struct regulator* ldo5;
-	
-	printk(KERN_ERR "%s %s\n", __func__, (en) ? "on" : "off");
-	if(!ldo14){
-		ldo14 = regulator_get(NULL,"8916_l14");
-		rc = regulator_set_voltage(ldo14,3000000,3000000);
-		pr_info("[NXP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: 8916_l14 set_level failed (%d)\n",__func__, rc);
-		}
-	}
-	if(!ldo5){
-		ldo5 = regulator_get(NULL,"8916_l5");
-		rc = regulator_set_voltage(ldo5,1800000,1800000);
-		pr_info("[NXP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: 8916_l5 set_level failed (%d)\n",__func__, rc);
-		}
-	}
-	
-	if(en){
-		rc = regulator_enable(ldo14);
-		if (rc){
-			printk(KERN_ERR "%s: 8916_l14 enable failed (%d)\n",__func__, rc);
-		}
-		rc = regulator_enable(ldo5);
-		if (rc){
-			printk(KERN_ERR "%s: 8916_l5 enable failed (%d)\n",__func__, rc);
-		}
-	}
-	else{
-		rc = regulator_disable(ldo14);
-		if (rc){
-			printk(KERN_ERR "%s: 8916_l14 disable failed (%d)\n",__func__, rc);
-		}
-	}
-	return;
-}
 
-
+#if 0
 int nfc_power_onoff(struct pn547_dev *data, bool onoff)
 {
 	int ret = -1;
@@ -414,8 +371,7 @@ int nfc_power_onoff(struct pn547_dev *data, bool onoff)
 	}
 	return 0;
 }
-
-*/
+#endif
 
 #ifdef CONFIG_OF
 static int pn547_parse_dt(struct device *dev,
@@ -432,7 +388,7 @@ static int pn547_parse_dt(struct device *dev,
 	pdata->firm_gpio = of_get_named_gpio_flags(np, "pn547,firm-gpio",
 		0, &pdata->firm_gpio_flags);
 #ifdef CONFIG_NFC_PN547_8916_USE_BBCLK2
-  	pdata->nfc_clock = clk_get(dev, "nfc_clock");
+	pdata->nfc_clock = clk_get(dev, "nfc_clock");
 	if (IS_ERR(pdata->nfc_clock)) {
 		pr_err("[NFC] %s: Couldn't get D1)\n",
 					__func__);
@@ -470,6 +426,8 @@ static int pn547_probe(struct i2c_client *client,
 	struct pinctrl *nfc_pinctrl;
 	struct pinctrl_state *nfc_suspend;
 	struct pinctrl_state *nfc_active;
+	//nfc_power_onoff(1);
+	//msleep(20);
 
 	if (client->dev.of_node) {
 		platform_data = devm_kzalloc(&client->dev,
@@ -582,7 +540,9 @@ static int pn547_probe(struct i2c_client *client,
 	wake_lock_init(&pn547_dev->nfc_wake_lock,
 			WAKE_LOCK_SUSPEND, "nfc_wake_lock");
 
-	//nfc_power_onoff(pn547_dev,1);
+#if 0
+	nfc_power_onoff(pn547_dev,1);
+#endif
 
 	ret = request_irq(client->irq, pn547_dev_irq_handler,
 			  IRQF_TRIGGER_RISING, "pn547", pn547_dev);

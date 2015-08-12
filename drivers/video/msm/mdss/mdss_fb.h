@@ -32,10 +32,12 @@
 
 #define MSM_FB_ENABLE_DBGFS
 #define WAIT_FENCE_FIRST_TIMEOUT (3 * MSEC_PER_SEC)
-#define WAIT_FENCE_FINAL_TIMEOUT (10 * MSEC_PER_SEC)
-/* Display op timeout should be greater than total timeout */
-#define WAIT_DISP_OP_TIMEOUT ((WAIT_FENCE_FIRST_TIMEOUT + \
-		WAIT_FENCE_FINAL_TIMEOUT) * MDP_MAX_FENCE_FD)
+#define WAIT_FENCE_FINAL_TIMEOUT (7 * MSEC_PER_SEC)
+/* Display op timeout should be greater than the total timeout but not
+ * unreasonably large. Set to 1s more than first wait + final wait which
+ * are already quite long and proceed without any further waits. */
+#define WAIT_DISP_OP_TIMEOUT (WAIT_FENCE_FIRST_TIMEOUT + \
+		WAIT_FENCE_FINAL_TIMEOUT + 1)
 
 #ifndef MAX
 #define  MAX(x, y) (((x) > (y)) ? (x) : (y))
@@ -45,13 +47,19 @@
 #define  MIN(x, y) (((x) < (y)) ? (x) : (y))
 #endif
 
+#define MDP_PP_AD_BL_LINEAR	0x0
+#define MDP_PP_AD_BL_LINEAR_INV	0x1
+
 /**
  * enum mdp_notify_event - Different frame events to indicate frame update state
  *
  * @MDP_NOTIFY_FRAME_BEGIN:	Frame update has started, the frame is about to
  *				be programmed into hardware.
+ * @MDP_NOTIFY_FRAME_CFG_DONE:	Frame configuration is done.
+ * @MDP_NOTIFY_FRAME_CTX_DONE:	Frame has finished accessing sw context.
+ *				Next frame can start preparing.
  * @MDP_NOTIFY_FRAME_READY:	Frame ready to be kicked off, this can be used
- *				as the last point in time to synchronized with
+ *				as the last point in time to synchronize with
  *				source buffers before kickoff.
  * @MDP_NOTIFY_FRAME_FLUSHED:	Configuration of frame has been flushed and
  *				DMA transfer has started.
@@ -65,6 +73,8 @@
  */
 enum mdp_notify_event {
 	MDP_NOTIFY_FRAME_BEGIN = 1,
+	MDP_NOTIFY_FRAME_CFG_DONE,
+	MDP_NOTIFY_FRAME_CTX_DONE,
 	MDP_NOTIFY_FRAME_READY,
 	MDP_NOTIFY_FRAME_FLUSHED,
 	MDP_NOTIFY_FRAME_DONE,
@@ -85,6 +95,19 @@ enum mdp_split_mode {
 	MDP_SPLIT_MODE_DST,
 };
 
+/**
+ * enum mdp_mmap_type - Lists the possible mmap type in the device
+ *
+ * @MDP_FB_MMAP_NONE: Unknown type.
+ * @MDP_FB_MMAP_ION_ALLOC:   Use ION allocate a buffer for mmap
+ * @MDP_FB_MMAP_PHYSICAL_ALLOC:  Use physical buffer for mmap
+ */
+enum mdp_mmap_type {
+	MDP_FB_MMAP_NONE,
+	MDP_FB_MMAP_ION_ALLOC,
+	MDP_FB_MMAP_PHYSICAL_ALLOC,
+};
+
 struct disp_info_type_suspend {
 	int op_enable;
 	int panel_power_state;
@@ -98,12 +121,15 @@ struct disp_info_notify {
 	int value;
 	int is_suspend;
 	int ref_count;
+	bool init_done;
 };
 
 struct msm_sync_pt_data {
 	char *fence_name;
 	u32 acq_fen_cnt;
 	struct sync_fence *acq_fen[MDP_MAX_FENCE_FD];
+	u32 temp_fen_cnt;
+	struct sync_fence *temp_fen[MDP_MAX_FENCE_FD];
 
 	struct sw_sync_timeline *timeline;
 	int timeline_value;
@@ -129,7 +155,8 @@ struct msm_mdp_interface {
 	int (*on_fnc)(struct msm_fb_data_type *mfd);
 	int (*off_fnc)(struct msm_fb_data_type *mfd);
 	/* called to release resources associated to the process */
-	int (*release_fnc)(struct msm_fb_data_type *mfd, bool release_all);
+	int (*release_fnc)(struct msm_fb_data_type *mfd, bool release_all,
+				uint32_t pid);
 	int (*kickoff_fnc)(struct msm_fb_data_type *mfd,
 					struct mdp_display_commit *data);
 	int (*ioctl_handler)(struct msm_fb_data_type *mfd, u32 cmd, void *arg);
@@ -139,7 +166,8 @@ struct msm_mdp_interface {
 	int (*lut_update)(struct msm_fb_data_type *mfd, struct fb_cmap *cmap);
 	int (*do_histogram)(struct msm_fb_data_type *mfd,
 				struct mdp_histogram *hist);
-	int (*update_ad_input)(struct msm_fb_data_type *mfd);
+	int (*ad_calc_bl)(struct msm_fb_data_type *mfd, int bl_in,
+		int *bl_out, bool *bl_out_notify);
 	int (*panel_register_done)(struct mdss_panel_data *pdata);
 	u32 (*fb_stride)(u32 fb_index, u32 xres, int bpp);
 	int (*splash_init_fnc)(struct msm_fb_data_type *mfd);
@@ -209,17 +237,15 @@ struct msm_fb_data_type {
 	int ext_ad_ctrl;
 	u32 ext_bl_ctrl;
 	u32 calib_mode;
+	u32 ad_bl_level;
 	u32 bl_level;
-	u32 bl_prev_level;
 	u32 bl_scale;
 	u32 bl_min_lvl;
 	u32 unset_bl_level;
 	u32 bl_updated;
 	u32 bl_level_scaled;
-	u32 bl_level_prev_scaled;
 	struct mutex bl_lock;
 
-	struct mutex ctx_lock;
 	struct platform_device *pdev;
 
 	u32 mdp_fb_page_protection;
@@ -254,8 +280,15 @@ struct msm_fb_data_type {
 	struct list_head proc_list;
 	struct ion_client *fb_ion_client;
 	struct ion_handle *fb_ion_handle;
-	u32 wait_for_kickoff;
+	struct dma_buf *fbmem_buf;
+
 	bool mdss_fb_split_stored;
+
+	u32 wait_for_kickoff;
+	u32 thermal_level;
+	int doze_mode;
+
+	int fb_mmap_type;
 };
 
 static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)
@@ -314,6 +347,12 @@ static inline bool mdss_fb_is_power_on_lp(struct msm_fb_data_type *mfd)
 	return mdss_panel_is_power_on_lp(mfd->panel_power_state);
 }
 
+static inline bool mdss_fb_is_hdmi_primary(struct msm_fb_data_type *mfd)
+{
+	return (mfd && (mfd->index == 0) &&
+		(mfd->panel_info->type == DTV_PANEL));
+}
+
 int mdss_fb_get_phys_info(dma_addr_t *start, unsigned long *len, int fb_num);
 void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl);
 void mdss_fb_update_backlight(struct msm_fb_data_type *mfd);
@@ -322,11 +361,14 @@ void mdss_fb_signal_timeline(struct msm_sync_pt_data *sync_pt_data);
 struct sync_fence *mdss_fb_sync_get_fence(struct sw_sync_timeline *timeline,
 				const char *fence_name, int val);
 int mdss_fb_register_mdp_instance(struct msm_mdp_interface *mdp);
-int mdss_fb_alloc_fb_ion_memory(struct msm_fb_data_type *mfd);
 int mdss_fb_dcm(struct msm_fb_data_type *mfd, int req_state);
 int mdss_fb_suspres_panel(struct device *dev, void *data);
 int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 		     unsigned long arg);
 int mdss_fb_compat_ioctl(struct fb_info *info, unsigned int cmd,
 			 unsigned long arg);
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+extern u8 csc_update;
+extern u8 csc_change;
+#endif
 #endif /* MDSS_FB_H */

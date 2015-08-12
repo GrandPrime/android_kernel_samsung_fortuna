@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2013 Samsung Electronics Co.Ltd
  * Author: Woonki Lee <woonki84.lee@samsung.com>
+ *         Heejae Kim <heejae12.kim@samsung.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -18,7 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * Last update: 2014-01-20
+ * Last update: 2014-07-15
  *
  */
 #ifdef CONFIG_SEC_NFC_IF_I2C_GPIO
@@ -37,7 +38,7 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
-#include <linux/nfc/sec_nfc.h>
+#include <linux/sec_nfc.h>
 #include <linux/wakelock.h>
 #include <linux/of_gpio.h>
 #include <linux/regulator/consumer.h>
@@ -88,7 +89,7 @@ struct sec_nfc_info {
 	struct device *dev;
 	struct sec_nfc_platform_data *pdata;
 	struct sec_nfc_i2c_info i2c_info;
-#if defined(CONFIG_SEC_NFC_CLK_REQ) || defined(CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE)
+#ifdef CONFIG_SEC_NFC_CLK_REQ
 	bool clk_ctl;
 	bool clk_state;
 #endif
@@ -99,21 +100,35 @@ struct sec_nfc_info {
 static irqreturn_t sec_nfc_irq_thread_fn(int irq, void *dev_id)
 {
 	struct sec_nfc_info *info = dev_id;
+	struct sec_nfc_platform_data *pdata = info->pdata;
+
+	dev_dbg(info->dev, "[NFC] Read Interrupt is occurred!\n");
+
+	if(gpio_get_value(pdata->irq) == 0) {
+		dev_err(info->dev, "[NFC] Warning,irq-gpio state is low!\n");
+		return IRQ_HANDLED;
+	}
 
 	mutex_lock(&info->i2c_info.read_mutex);
-#if 1	/* workaround for SPRD AP: do not read after power swiching */
+	/* Skip interrupt during power switching
+	 * It is released after first write */
 	if (info->i2c_info.read_irq == SEC_NFC_SKIP) {
 		dev_dbg(info->dev, "%s: Now power swiching. Skip this IRQ\n", __func__);
 		mutex_unlock(&info->i2c_info.read_mutex);
 		return IRQ_HANDLED;
 	}
-#endif
+
 	info->i2c_info.read_irq = SEC_NFC_INT;
 	mutex_unlock(&info->i2c_info.read_mutex);
 
 	wake_up_interruptible(&info->i2c_info.read_wait);
 
-	wake_lock_timeout(&info->wake_lock, 2 * HZ);
+	if(!wake_lock_active(&info->wake_lock))
+	{
+		dev_dbg(info->dev, "%s: Set wake_lock_timeout for 2 sec. !!!\n", __func__);
+		wake_lock_timeout(&info->wake_lock, 2 * HZ);
+	}
+
 	return IRQ_HANDLED;
 }
 
@@ -163,7 +178,7 @@ static ssize_t sec_nfc_read(struct file *file, char __user *buf,
 	memset(info->i2c_info.buf, 0, count);
 	ret = i2c_master_recv(info->i2c_info.i2c_dev, info->i2c_info.buf,
 			count);
-	pr_info("[NFC] %s : recv size : %d\n", __func__, ret);
+	dev_dbg(info->dev, "%s: recv size : %d\n", __func__, ret);
 
 	if (ret == -EREMOTEIO) {
 		ret = -ERESTART;
@@ -228,15 +243,13 @@ static ssize_t sec_nfc_write(struct file *file, const char __user *buf,
 		goto out;
 	}
 
-#if 1	/* workaround for SPRD AP: do not read after power swiching */
+	/* Skip interrupt during power switching
+	 * It is released after first write */
 	mutex_lock(&info->i2c_info.read_mutex);
 	ret = i2c_master_send(info->i2c_info.i2c_dev, info->i2c_info.buf, count);
 	if (info->i2c_info.read_irq == SEC_NFC_SKIP)
 		info->i2c_info.read_irq = SEC_NFC_NONE;
 	mutex_unlock(&info->i2c_info.read_mutex);
-#else
-	ret = i2c_master_send(info->i2c_info.i2c_dev, info->i2c_info.buf, count);
-#endif
 
 	if (ret == -EREMOTEIO) {
 		dev_err(info->dev, "[NFC] send failed: return: %d count: %d\n",
@@ -304,12 +317,12 @@ int sec_nfc_i2c_probe(struct i2c_client *client)
 	struct sec_nfc_platform_data *pdata = info->pdata;
 	int ret;
 
-	pr_info("[NFC] %s start\n", __func__);
+	pr_info("%s start\n", __func__);
 
-	pr_info("info      : %p\n", info);
-	pr_info("pdata     : %p\n", pdata);
-	pr_info("pdata->irq: %d\n", pdata->irq);
-	pr_info("client->irq:%d\n", client->irq);
+	pr_info("%s : info       : %p\n", __func__, info);
+	pr_info("%s : pdata      : %p\n", __func__, pdata);
+	pr_info("%s : pdata->irq : %d\n", __func__, pdata->irq);
+	pr_info("%s : client->irq: %d\n", __func__, client->irq);
 	/* pdata->irq = client->irq;*/
 	info->i2c_info.buflen = SEC_NFC_MAX_BUFFER_SIZE;
 	info->i2c_info.buf = kzalloc(SEC_NFC_MAX_BUFFER_SIZE, GFP_KERNEL);
@@ -327,6 +340,13 @@ int sec_nfc_i2c_probe(struct i2c_client *client)
 
 	info->dev = dev;
 
+	ret = gpio_request(pdata->irq, "nfc_int");
+	if (ret) {
+		dev_err(dev, "GPIO request is failed to register IRQ\n");
+		goto err_irq_req;
+	}
+	gpio_direction_input(pdata->irq);
+
 	ret = request_threaded_irq(client->irq, NULL, sec_nfc_irq_thread_fn,
 			IRQF_TRIGGER_RISING | IRQF_ONESHOT, SEC_NFC_DRIVER_NAME,
 			info);
@@ -336,8 +356,10 @@ int sec_nfc_i2c_probe(struct i2c_client *client)
 		return ret;
 	}
 
-	pr_info("[NFC] %s success\n", __func__);
+	pr_info("%s success\n", __func__);
 	return 0;
+err_irq_req:
+	return ret;
 }
 
 void sec_nfc_i2c_remove(struct device *dev)
@@ -345,6 +367,7 @@ void sec_nfc_i2c_remove(struct device *dev)
 	struct sec_nfc_info *info = dev_get_drvdata(dev);
 	struct i2c_client *client = info->i2c_info.i2c_dev;
 	struct sec_nfc_platform_data *pdata = info->pdata;
+
 	free_irq(client->irq, info);
 	gpio_free(pdata->irq);
 }
@@ -390,13 +413,20 @@ void sec_nfc_clk_ctl_enable(struct sec_nfc_info *info)
 	struct sec_nfc_platform_data *pdata = info->pdata;
 	int ret;
 
-	pr_info("[NFC] %s : start\n", __func__);
+	pr_info("%s : start\n", __func__);
 
 	if (info->clk_ctl)
 		return;
+
+	ret = gpio_request(pdata->clk_req, "nfc-ex-clk");
+	if (ret) {
+		dev_err(info->dev, "failed to get gpio ven\n");
+		return;
+	}
+
 	info->clk_state = false;
 	pdata->clk_irq = gpio_to_irq(pdata->clk_req);
-	pr_info("[NFC] %s : goio to irq = %d\n", __func__, pdata->clk_irq);
+	pr_info("%s : goio to irq = %d\n", __func__, pdata->clk_irq);
 	ret = request_threaded_irq(pdata->clk_irq, NULL, sec_nfc_clk_irq_thread,
 			IRQF_TRIGGER_RISING |
 			IRQF_TRIGGER_FALLING |
@@ -411,13 +441,14 @@ void sec_nfc_clk_ctl_disable(struct sec_nfc_info *info)
 {
 	struct sec_nfc_platform_data *pdata = info->pdata;
 
-	pr_info("[NFC] %s : start\n", __func__);
+	pr_info("%s : start\n", __func__);
 
 	if (!info->clk_ctl)
 		return;
 
 	free_irq(pdata->clk_irq, info);
-	pr_info("[NFC] %s : free irq = %d\n", __func__, pdata->clk_irq);
+	gpio_free(pdata->clk_req);
+	pr_info("%s : free irq = %d\n", __func__, pdata->clk_irq);
 	if (info->clk_state)
 		sec_nfc_clk_off(pdata->clk_enable);
 
@@ -434,20 +465,24 @@ static void sec_nfc_set_mode(struct sec_nfc_info *info,
 {
 	struct sec_nfc_platform_data *pdata = info->pdata;
 
-	pr_info("[NFC] %s : start %d\n", __func__, mode);
-	/* intfo lock is aleady getten before calling this function */
+	pr_info("%s : start %d\n", __func__, mode);
+	/* intfo lock is aleady gotten before calling this function */
 	if (info->mode == mode) {
 		dev_dbg(info->dev, "Power mode is already %d", mode);
 		return;
 	}
+
 	info->mode = mode;
-#if 1	/* workaround for SPRD AP: do not read after power swiching */
+
 #ifdef CONFIG_SEC_NFC_IF_I2C
+	/* Skip interrupt during power switching
+	 * It is released after first write */
 	mutex_lock(&info->i2c_info.read_mutex);
 	info->i2c_info.read_irq = SEC_NFC_SKIP;
 	mutex_unlock(&info->i2c_info.read_mutex);
 #endif
-#endif
+
+	gpio_set_value_cansleep(pdata->ven, 0);
 	gpio_set_value(pdata->ven, SEC_NFC_PW_OFF);
 	if (pdata->firm)
 		gpio_set_value(pdata->firm, SEC_NFC_FW_OFF);
@@ -460,41 +495,21 @@ static void sec_nfc_set_mode(struct sec_nfc_info *info,
 		msleep(SEC_NFC_VEN_WAIT_TIME);
 		gpio_set_value_cansleep(pdata->ven, 1);
 		gpio_set_value(pdata->ven, SEC_NFC_PW_ON);
-#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
-		if(!info->clk_state){
-			pr_info("[NFC] %s :NFC-ON clk_prepare_enable \n", __func__);
-			clk_prepare_enable(pdata->nfc_clk);
-			info->clk_state = true;
-			info->clk_ctl = true;
-		}
-#else
 		sec_nfc_clk_ctl_enable(info);
-#endif
 		msleep(SEC_NFC_VEN_WAIT_TIME/2);
 #ifdef CONFIG_SEC_NFC_IF_I2C
 		enable_irq_wake(info->i2c_info.i2c_dev->irq);
 #endif
 	} else {
-#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
-		if(info->clk_state){
-			pr_info("[NFC] %s :NFC-OFF clk_disable_unprepare \n", __func__);
-			clk_disable_unprepare(pdata->nfc_clk);
-			info->clk_state = false;
-			info->clk_ctl = false;
-		}
-#else
 		sec_nfc_clk_ctl_disable(info);
-#endif
-
 #ifdef CONFIG_SEC_NFC_IF_I2C
 		disable_irq_wake(info->i2c_info.i2c_dev->irq);
 #endif
 	}
 
-//	sec_nfc_i2c_irq_clear(info);
-	if(wake_lock_active(&info->wake_lock)) {
+	if(wake_lock_active(&info->wake_lock))
 		wake_unlock(&info->wake_lock);
-	}
+
 	dev_dbg(info->dev, "[NFC] Power mode is : %d\n", mode);
 }
 
@@ -569,7 +584,7 @@ static int sec_nfc_open(struct inode *inode, struct file *file)
 						struct sec_nfc_info, miscdev);
 	int ret = 0;
 
-	pr_info("[NFC] %s : start\n", __func__);
+	pr_info("%s : start\n", __func__);
 	dev_dbg(info->dev, "[NFC] %s: info : %p\n" , __func__, info);
 
 	mutex_lock(&info->mutex);
@@ -582,6 +597,7 @@ static int sec_nfc_open(struct inode *inode, struct file *file)
 	sec_nfc_set_mode(info, SEC_NFC_MODE_OFF);
 out:
 	mutex_unlock(&info->mutex);
+
 	return ret;
 }
 
@@ -590,7 +606,7 @@ static int sec_nfc_close(struct inode *inode, struct file *file)
 	struct sec_nfc_info *info = container_of(file->private_data,
 						struct sec_nfc_info, miscdev);
 
-	pr_info("[NFC] %s : start\n", __func__);
+	pr_info("%s : start\n", __func__);
 	dev_dbg(info->dev, "[NFC] %s: info : %p\n" , __func__, info);
 
 	mutex_lock(&info->mutex);
@@ -614,20 +630,8 @@ static const struct file_operations sec_nfc_fops = {
 static int sec_nfc_suspend(struct device *dev)
 {
 	struct sec_nfc_info *info = SEC_NFC_GET_INFO(dev);
-#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
-	struct sec_nfc_platform_data *pdata = info->pdata;
-#endif
 	int ret = 0;
 
-	dev_dbg(info->dev, "%s\n", __func__);
-	pr_info("[NFC] %s\n", __func__);
-#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
-	if (info->clk_state){
-		pr_info("[NFC] %s : clk_disable_unprepare \n", __func__);
-		clk_disable_unprepare(pdata->nfc_clk);
-		info->clk_state = false;
-	}
-#endif
 	mutex_lock(&info->mutex);
 
 	if (info->mode == SEC_NFC_MODE_BOOTLOADER)
@@ -640,22 +644,6 @@ static int sec_nfc_suspend(struct device *dev)
 
 static int sec_nfc_resume(struct device *dev)
 {
-#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
-	struct sec_nfc_info *info = SEC_NFC_GET_INFO(dev);
-	struct sec_nfc_platform_data *pdata = info->pdata;
-
-	dev_dbg(info->dev, "%s\n", __func__);
-	pr_info("[NFC] %s\n", __func__);
-	if (!info->clk_ctl){
-		pr_info("[NFC] %s : Clock is off during NFC-OFF \n", __func__);
-		return 0;
-	}
-	if(!info->clk_state){
-		pr_info("[NFC] %s : clk_prepare_enable \n", __func__);
-		clk_prepare_enable(pdata->nfc_clk);
-		info->clk_state = true;
-	}
-#endif
 	return 0;
 }
 
@@ -667,22 +655,25 @@ static SIMPLE_DEV_PM_OPS(sec_nfc_pm_ops, sec_nfc_suspend, sec_nfc_resume);
 static int sec_nfc_parse_dt(struct device *dev,
 	struct sec_nfc_platform_data *pdata)
 {
-	int gpio;
+	//int gpio;
+#ifdef CONFIG_SEC_NFC_CLK_REQ
 	enum of_gpio_flags flags;
+#endif
 	struct device_node *np = dev->of_node;
+
 	pdata->ven = of_get_named_gpio_flags(np, "sec-nfc,ven-gpio",
 		0, &pdata->ven_gpio_flags);
 	pdata->firm = of_get_named_gpio_flags(np, "sec-nfc,firm-gpio",
 		0, &pdata->firm_gpio_flags);
 	pdata->wake = pdata->firm;
-	gpio = of_get_named_gpio_flags(np, "sec-nfc,irq-gpio",
-		0, &flags);
-	pdata->irq = gpio_to_irq(gpio);
-	if (!pdata->irq)
-		pr_err("[NFC] %s : nfc irq fail\n", __func__);
+#ifdef CONFIG_SEC_NFC_IF_I2C
+	pdata->irq = of_get_named_gpio_flags(np, "sec-nfc,irq-gpio",
+		0, &pdata->irq_gpio_flags);
+#endif
+
 #ifdef CONFIG_SEC_NFC_CLK_REQ
 	pdata->clk_enable = of_get_named_gpio_flags(np, "sec-nfc,ext_clk-gpio",
-		0, &pdata->irq_gpio_flags);
+		0, &flags);
 #endif
 
 #ifdef CONFIG_SEC_NFC_USE_8916_BBCLK2
@@ -690,27 +681,17 @@ static int sec_nfc_parse_dt(struct device *dev,
 	if (IS_ERR(pdata->nfc_clk)) {
 		pr_err("[NFC] %s: Couldn't get D1)\n",
 					__func__);
-	}
-#ifndef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
-	else {
+	} else {
 		if (clk_prepare_enable(pdata->nfc_clk))
 			pr_err("[NFC] %s: Couldn't prepare D1\n",
 					__func__);
 	}
 #endif
-#endif
-
-#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
-	clk_disable_unprepare(pdata->nfc_clk);
-#endif
-	pr_info("[NFC] %s : result\n", __func__);
-	pr_info("      ven-gpio\t= %d\n", pdata->ven);
-	pr_info("      firm-gpio\t= %d\n", pdata->firm);
-	pr_info("      wake-gpio\t= %d\n", pdata->wake);
-	pr_info("      irq-gpio\t= %d\n", gpio);
-	pr_info("      irq num\t= %d\n", pdata->irq);
-
-	pr_info("[NFC] %s : done\n", __func__);
+	pr_info("%s : ven-gpio\t= %d\n", __func__, pdata->ven);
+	pr_info("%s : firm-gpio\t= %d\n", __func__, pdata->firm);
+	pr_info("%s : wake-gpio\t= %d\n", __func__, pdata->wake);
+	pr_info("%s : irq num\t= %d\n", __func__, pdata->irq);
+	pr_info("%s : done\n", __func__);
 	return 0;
 }
 
@@ -773,7 +754,7 @@ static int __sec_nfc_probe(struct device *dev)
 	struct sec_nfc_platform_data *pdata = NULL;
 	int ret = 0;
 
-	pr_info("[NFC] %s : start\n", __func__);
+	pr_info("%s : start\n", __func__);
 	if (dev->of_node) {
 		pdata = devm_kzalloc(dev,
 			sizeof(struct sec_nfc_platform_data), GFP_KERNEL);
@@ -812,11 +793,6 @@ static int __sec_nfc_probe(struct device *dev)
 	mutex_init(&info->mutex);
 	dev_set_drvdata(dev, info);
 
-#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
-	info->clk_state = false;
-	info->clk_ctl = false;
-#endif
-
 	info->miscdev.minor = MISC_DYNAMIC_MINOR;
 	info->miscdev.name = SEC_NFC_DRIVER_NAME;
 	info->miscdev.fops = &sec_nfc_fops;
@@ -846,7 +822,7 @@ static int __sec_nfc_probe(struct device *dev)
 	wake_lock_init(&info->wake_lock, WAKE_LOCK_SUSPEND, "NFCWAKE");
 
 	dev_dbg(dev, "[NFC] %s: info: %p, pdata %p\n", __func__, info, pdata);
-	pr_err("[NFC] %s : success\n", __func__);
+	pr_info("%s : success\n", __func__);
 
 	return 0;
 
@@ -998,5 +974,4 @@ module_exit(sec_nfc_exit);
 
 MODULE_DESCRIPTION("Samsung sec_nfc driver");
 MODULE_LICENSE("GPL");
-
 

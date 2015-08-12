@@ -103,7 +103,8 @@ static int modem_shutdown(const struct subsys_desc *subsys, bool force_stop)
 	if (subsys->is_not_loadable)
 		return 0;
 
-	if (!subsys_get_crash_status(drv->subsys) && force_stop) {
+	if (!subsys_get_crash_status(drv->subsys) && force_stop &&
+	    subsys->force_stop_gpio) {
 		gpio_set_value(subsys->force_stop_gpio, 1);
 		ret = wait_for_completion_timeout(&drv->stop_ack,
 				msecs_to_jiffies(STOP_ACK_TIMEOUT_MS));
@@ -145,7 +146,8 @@ static void modem_crash_shutdown(const struct subsys_desc *subsys)
 {
 	struct modem_data *drv = subsys_to_drv(subsys);
 	drv->crash_shutdown = true;
-	if (!subsys_get_crash_status(drv->subsys)) {
+	if (!subsys_get_crash_status(drv->subsys) &&
+		subsys->force_stop_gpio) {
 		gpio_set_value(subsys->force_stop_gpio, 1);
 		mdelay(STOP_ACK_TIMEOUT_MS);
 	}
@@ -171,10 +173,10 @@ static int modem_ramdump(int enable, const struct subsys_desc *subsys)
 	if (ret < 0)
 		pr_err("Unable to dump modem fw memory (rc = %d).\n", ret);
 
-	dma_free_coherent(&drv->mba_mem_dev, drv->q6->mba_size,
-				drv->q6->mba_virt, drv->q6->mba_phys);
+	ret = pil_mss_deinit_image(&drv->q6->desc);
+	if (ret < 0)
+		pr_err("Unable to free up resources (rc = %d).\n", ret);
 
-	pil_mss_shutdown(&drv->q6->desc);
 	pil_mss_remove_proxy_votes(&drv->q6->desc);
 	return ret;
 }
@@ -184,12 +186,7 @@ static irqreturn_t modem_wdog_bite_intr_handler(int irq, void *dev_id)
 	struct modem_data *drv = subsys_to_drv(dev_id);
 	if (drv->ignore_errors)
 		return IRQ_HANDLED;
-
 	pr_err("Watchdog bite received from modem software!\n");
-	if (drv->subsys_desc.system_debug &&
-			!gpio_get_value(drv->subsys_desc.err_fatal_gpio))
-		panic("%s: System ramdump requested. Triggering device restart!\n",
-							__func__);
 	subsys_set_crash_status(drv->subsys, true);
 	restart_modem(drv);
 	return IRQ_HANDLED;
@@ -323,6 +320,11 @@ static int pil_mss_loadable_init(struct modem_data *drv,
 	q6->rom_clk = devm_clk_get(&pdev->dev, "mem_clk");
 	if (IS_ERR(q6->rom_clk))
 		return PTR_ERR(q6->rom_clk);
+
+	/* Optional. */
+	if (of_property_match_string(pdev->dev.of_node,
+			"qcom,active-clock-names", "gpll0_mss_clk") >= 0)
+		q6->gpll0_mss_clk = devm_clk_get(&pdev->dev, "gpll0_mss_clk");
 
 	ret = pil_desc_init(q6_desc);
 

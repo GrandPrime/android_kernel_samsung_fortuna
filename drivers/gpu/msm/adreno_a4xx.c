@@ -559,6 +559,10 @@ static void a4xx_enable_hwcg(struct kgsl_device *device)
 	else
 		kgsl_regwrite(device, A4XX_RBBM_CLOCK_CTL, 0xAAAAAAAA);
 	kgsl_regwrite(device, A4XX_RBBM_CLOCK_CTL2, 0);
+
+	/* Disable dynamic gmem clock gating for A405 */
+	if (adreno_is_a405(adreno_dev))
+		kgsl_regwrite(device, A4XX_RBBM_GPR0_CTL, 0x000000C0);
 }
 
 /**
@@ -898,10 +902,19 @@ void a4xx_err_callback(struct adreno_device *adreno_dev, int bit)
 			"ringbuffer reserved bit error interrupt\n");
 		break;
 	case A4XX_INT_CP_HW_FAULT:
+	{
+		struct adreno_gpudev *gpudev = ADRENO_GPU_DEVICE(adreno_dev);
 		kgsl_regread(device, A4XX_CP_HW_FAULT, &reg);
 		KGSL_DRV_CRIT_RATELIMIT(device,
 			"CP | Ringbuffer HW fault | status=%x\n", reg);
+		/*
+		* mask off this interrupt since it can spam, it will be
+		* turned on again when device resets
+		*/
+		adreno_writereg(adreno_dev, ADRENO_REG_RBBM_INT_0_MASK,
+		gpudev->irq->mask & ~(1 << A4XX_INT_CP_HW_FAULT));
 		break;
+	}
 	case A4XX_INT_CP_REG_PROTECT_FAULT:
 		kgsl_regread(device, A4XX_CP_PROTECT_STATUS, &reg);
 		KGSL_DRV_CRIT(device,
@@ -995,10 +1008,6 @@ static unsigned int a4xx_register_offsets[ADRENO_REG_REGISTER_MAX] = {
 				A4XX_RBBM_SECVID_TRUST_CONTROL),
 	ADRENO_REG_DEFINE(ADRENO_REG_RBBM_ALWAYSON_COUNTER_LO,
 				A4XX_RBBM_ALWAYSON_COUNTER_LO),
-	ADRENO_REG_DEFINE(ADRENO_REG_VBIF_XIN_HALT_CTRL0,
-				A4XX_VBIF_XIN_HALT_CTRL0),
-	ADRENO_REG_DEFINE(ADRENO_REG_VBIF_XIN_HALT_CTRL1,
-				A4XX_VBIF_XIN_HALT_CTRL1),
 };
 
 const struct adreno_reg_offsets a4xx_reg_offsets = {
@@ -1809,7 +1818,6 @@ struct adreno_gpudev adreno_a4xx_gpudev = {
 	.irq_trace = trace_kgsl_a4xx_irq_status,
 	.snapshot_data = &a4xx_snapshot_data,
 	.num_prio_levels = 1,
-	.vbif_xin_halt_ctrl0_mask = A4XX_VBIF_XIN_HALT_CTRL0_MASK,
 
 	.perfcounter_init = a4xx_perfcounter_init,
 	.rb_init = a3xx_rb_init,

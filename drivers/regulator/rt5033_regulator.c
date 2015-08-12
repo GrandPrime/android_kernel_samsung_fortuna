@@ -280,7 +280,7 @@ static int rt5033_regulator_enable(struct regulator_dev *rdev)
 	pmic_state = rt5033_get_pmic_state(info->i2c);
 	if (chip_rev >= RT5033A_REV && prev_pmic_state == false && pmic_state == true)
 		rt5033_clr_bits(info->i2c, 0x6b, 0x01);
-	msleep(1);
+	mdelay(1);
 
 #if EN_DCDC_FORCE_PWM
 	/* Enable Force PWM for Buck */
@@ -290,8 +290,7 @@ static int rt5033_regulator_enable(struct regulator_dev *rdev)
 	ret = rt5033_set_bits(info->i2c, info->enable_reg,
 			info->enable_bit);
 	pr_info("%s %s %s ret (%d)\n", ALIAS_NAME, rdev->desc->name, __func__, ret);
-	msleep(1);
-	rt5033_read_dump(info->i2c);
+	mdelay(1);
 
 	rt5033_unlock_regulator(info->i2c);
 
@@ -305,19 +304,19 @@ static int rt5033_regulator_disable(struct regulator_dev *rdev)
 	bool prev_pmic_state, pmic_state;
 	rt5033_lock_regulator(info->i2c);
 
-	msleep(1);
+	mdelay(1);
 	pr_info("%s Disable regulator %s\n", ALIAS_NAME, rdev->desc->name);
 #if EN_DCDC_FORCE_PWM
 	/* Disable Force PWM for Buck */
 	if (info->desc.id == RT5033_ID_DCDC1) {
 		rt5033_clr_bits(info->i2c, 0x41, 0x01);
-		usleep(100);
+		udelay(100);
 	}
 #endif /* EN_DCDC_FORCE_PWM */
 	ret = rt5033_clr_bits(info->i2c, info->enable_reg,
 			info->enable_bit);
 	pr_info("%s %s ret (%d)\n", ALIAS_NAME, __func__, ret);
-	usleep(500);
+	udelay(500);
 	prev_pmic_state = rt5033_get_pmic_state(info->i2c);
 	rt5033_set_regulator_state(info->i2c, info->desc.id, false);
 	pmic_state = rt5033_get_pmic_state(info->i2c);
@@ -380,10 +379,16 @@ static int rt5033_regulator_get_status(struct regulator_dev *rdev)
 {
 	struct rt5033_regulator_info *info = rdev_get_drvdata(rdev);
 	/* REGULATOR_STATUS_OFF, REGULATOR_STATUS_ON, REGULATOR_STATUS_OFF */
-	int ret = REGULATOR_STATUS_ERROR;
+	int ret = REGULATOR_STATUS_ERROR; /* 2 */
 	int org_regval, dump_reg;
 	//int sta1, sta2;
 	uint16_t sta1, sta2;
+#ifndef CONFIG_MFD_RT5033_RESET_GPIO
+	/* if there are no reset solution(MRSTB or I2C),
+       skip reset workaround(always return true) */
+	if (chip_rev < RT5033A_REV)
+		return REGULATOR_STATUS_ON;
+#endif
 	rt5033_lock_regulator(info->i2c);
 	/* First time to check it */
 	msleep(2);
@@ -431,6 +436,8 @@ rt5033_reg_status_ok:
 rt5033_reg_status_exit:
 	rt5033_reg_write(info->i2c, 0xf0, org_regval);
 	rt5033_unlock_regulator(info->i2c);
+	if (ret==REGULATOR_STATUS_ERROR && chip_rev >= RT5033A_REV)
+		ret = REGULATOR_STATUS_UNDEFINED; /* 8 */
 	pr_err("%s ret:%d\n", __func__, ret);
 	return ret;
 }

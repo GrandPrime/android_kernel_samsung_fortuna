@@ -180,6 +180,7 @@
 		coresight-outports = <0>;
 		coresight-child-list = <&funnel_in0>;
 		coresight-child-ports = <7>;
+		qcom,data-barrier;
 		clocks = <&clock_rpm clk_qdss_clk>,
 			 <&clock_rpm clk_qdss_a_clk>;
 		clock-names = "core_clk", "core_a_clk";
@@ -213,7 +214,6 @@
 		coresight-child-ports = <0>;
 		coresight-etm-cpu = <&CPU0>;
 
-		qcom,round-robin;
 		clocks = <&clock_rpm clk_qdss_clk>,
 			 <&clock_rpm clk_qdss_a_clk>;
 		clock-names = "core_clk", "core_a_clk";
@@ -232,7 +232,6 @@
 		coresight-child-ports = <1>;
 		coresight-etm-cpu = <&CPU1>;
 
-		qcom,round-robin;
 		clocks = <&clock_rpm clk_qdss_clk>,
 			 <&clock_rpm clk_qdss_a_clk>;
 		clock-names = "core_clk", "core_a_clk";
@@ -251,7 +250,6 @@
 		coresight-child-ports = <2>;
 		coresight-etm-cpu = <&CPU2>;
 
-		qcom,round-robin;
 		clocks = <&clock_rpm clk_qdss_clk>,
 			 <&clock_rpm clk_qdss_a_clk>;
 		clock-names = "core_clk", "core_a_clk";
@@ -270,7 +268,6 @@
 		coresight-child-ports = <3>;
 		coresight-etm-cpu = <&CPU3>;
 
-		qcom,round-robin;
 		clocks = <&clock_rpm clk_qdss_clk>,
 			 <&clock_rpm clk_qdss_a_clk>;
 		clock-names = "core_clk", "core_a_clk";
@@ -561,7 +558,7 @@
 	hwevent: hwevent@86c000 {
 		compatible = "qcom,coresight-hwevent";
 		reg = <0x86c000 0x108>,
-			<0x86cfb0 0x4>,
+		      <0x86cfb0 0x4>,
 		      <0x200c000 0x28>,
 		      <0x78c5010 0x4>,
 		      <0x7885010 0x4>;

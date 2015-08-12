@@ -2412,6 +2412,7 @@ static int venus_hfi_core_release(void *device)
 	}
 
 	if (dev->hal_client) {
+		cancel_delayed_work_sync(&venus_hfi_pm_work); 
 		if (venus_hfi_power_enable(device)) {
 			dprintk(VIDC_ERR,
 				"%s: Power enable failed\n", __func__);
@@ -2732,8 +2733,14 @@ static int venus_hfi_session_end(void *session)
 		HFI_CMD_SYS_SESSION_END);
 }
 
-static int venus_hfi_session_abort(void *session)
+static int venus_hfi_session_abort(void *sess)
 {
+	struct hal_session *session;
+	session = sess;
+	if (!session || !session->device) {
+		dprintk(VIDC_ERR, "Invalid Params\n");
+		return -EINVAL;
+	}
 	venus_hfi_flush_debug_queue(
 		((struct hal_session *)session)->device, NULL);
 	return venus_hfi_send_session_cmd(session,

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -42,19 +42,30 @@ enum pon_trigger_source {
  * %PON_POWER_OFF_WARM_RESET:	Reset the MSM but not all PMIC peripherals
  * %PON_POWER_OFF_SHUTDOWN:	Shutdown the MSM and PMIC completely
  * %PON_POWER_OFF_HARD_RESET:	Reset the MSM and all PMIC peripherals
-};
  */
 enum pon_power_off_type {
 	PON_POWER_OFF_WARM_RESET	= 0x01,
 	PON_POWER_OFF_SHUTDOWN		= 0x04,
 	PON_POWER_OFF_HARD_RESET	= 0x07,
 };
-
+#ifdef CONFIG_QCOM_HARDREBOOT_IMPLEMENTATION
+enum pon_restart_reason {
+	PON_RESTART_REASON_UNKNOWN	= 0x00,
+	PON_RESTART_REASON_RECOVERY	= 0x01,
+	PON_RESTART_REASON_BOOTLOADER	= 0x02,
+	PON_RESTART_REASON_RTC		= 0x03,
+};
+#endif
 #ifdef CONFIG_QPNP_POWER_ON
 int qpnp_pon_system_pwr_off(enum pon_power_off_type type);
 int qpnp_pon_is_warm_reset(void);
 int qpnp_pon_trigger_config(enum pon_trigger_source pon_src, bool enable);
 int qpnp_pon_wd_config(bool enable);
+#ifdef CONFIG_QCOM_HARDREBOOT_IMPLEMENTATION
+int qpnp_pon_set_restart_reason(enum pon_restart_reason reason);
+bool qpnp_pon_check_hard_reset_stored(void);
+#endif
+
 #if defined(CONFIG_QPNP_RESIN)
 int qpnp_resin_state(void);
 #endif
@@ -73,6 +84,16 @@ int qpnp_pon_wd_config(bool enable)
 {
 	return -ENODEV;
 }
+#ifdef CONFIG_QCOM_HARDREBOOT_IMPLEMENTATION
+static inline int qpnp_pon_set_restart_reason(enum pon_restart_reason reason)
+{
+	return -ENODEV;
+}
+static inline bool qpnp_pon_check_hard_reset_stored(void)
+{
+	return false;
+}
+#endif
 #if defined(CONFIG_QPNP_RESIN)
 static int qpnp_resin_state(void) { return -ENODEV; };
 #endif

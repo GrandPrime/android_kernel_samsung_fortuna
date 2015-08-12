@@ -34,6 +34,9 @@
 #include "ist30xx_misc.h"
 #include "ist30xx_cmcs.h"
 
+#ifdef CONFIG_CPU_FREQ_LIMIT_USERSPACE
+#include <linux/cpufreq.h>
+#endif
 #define FW_DOWNLOADING "Downloading"
 #define FW_DOWNLOAD_COMPLETE "Complete"
 #define FW_DOWNLOAD_FAIL "FAIL"
@@ -177,6 +180,50 @@ static void not_support_cmd(void *dev_data)
 	sec->cmd_state = CMD_STATE_WAITING;
 	return;
 }
+
+#if defined(TOUCH_BOOSTER)
+static void boost_level(void *dev_data)
+{
+        struct ist30xx_data *info = (struct ist30xx_data *)dev_data;
+        struct sec_factory *sec = (struct sec_factory *)&info->sec;
+        char buf[16] = { 0 };
+        int retval;
+
+        set_default_result(sec);
+
+        info->dvfs_boost_mode =  sec->cmd_param[0];
+
+	snprintf(buf, sizeof(buf), "%s", "OK");
+        sec->cmd_state = CMD_STATE_OK;
+
+        if (info->dvfs_boost_mode == DVFS_STAGE_NONE) {
+		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
+                if (retval < 0) {
+                        dev_err(&info->client->dev,
+                                        "%s: booster stop failed(%d).\n",
+                                        __func__, retval);
+                        snprintf(buf, sizeof(buf), "%s", "NG");
+                        sec->cmd_state = CMD_STATE_FAIL;
+			info->dvfs_lock_status = false;
+                }
+        }
+
+        set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
+
+        mutex_lock(&sec->cmd_lock);
+        sec->cmd_is_running = false;
+        mutex_unlock(&sec->cmd_lock);
+
+        sec->cmd_state = CMD_STATE_WAITING;
+
+        tsp_info("%s(), [%d][%d]: %s\n", __func__,
+                 sec->cmd_param[0], sec->cmd_param[1], buf);
+        dev_info(&info->client->dev, "%s: %s(%d)\n", __func__, buf,
+                 strnlen(buf, sizeof(buf)));
+
+        return;
+}
+#endif
 
 static void get_chip_vendor(void *dev_data)
 {
@@ -942,12 +989,14 @@ struct tsp_cmd tsp_cmds[] = {
 	{ TSP_CMD("get_x_num",			get_x_num),	  	  },
 	{ TSP_CMD("get_y_num",			get_y_num),	  	  },
 	{ TSP_CMD("run_reference_read", run_raw_read),	  },
-	{ TSP_CMD("run_raw_read",	 run_raw_read),	  },
-	{ TSP_CMD("get_reference",	 get_raw_value),	  },
-	{ TSP_CMD("get_raw_value",	 get_raw_value),	  },
-    { TSP_CMD("run_cm_test",    	run_cm_test),     },
-    { TSP_CMD("get_cm_value",       get_cm_value),    },
-    { TSP_CMD("get_module_vendor",  not_support_cmd), },
+	{ TSP_CMD("run_raw_read",	 	run_raw_read),	  },
+	{ TSP_CMD("get_reference",	 	get_raw_value),	  },
+	{ TSP_CMD("get_raw_value",	 	get_raw_value),	  },
+    { TSP_CMD("run_cm_test",     	run_cm_test),     },
+    { TSP_CMD("get_cm_value",       get_cm_value),    },    
+#if defined(TOUCH_BOOSTER)
+	{ TSP_CMD("boost_level",     boost_level),     },
+#endif
 	{ TSP_CMD("not_support_cmd", 	not_support_cmd), },
 };
 

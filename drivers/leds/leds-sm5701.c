@@ -22,7 +22,19 @@
 #include <linux/mfd/sm5701_core.h>
 #include <linux/of_gpio.h>
 //#include <linux/platform_data/leds-sm5701.h>
+#include <linux/kernel.h>
+#include <linux/leds/rtfled.h>
+#include <linux/version.h>
+#include <linux/of.h>
+#include <linux/init.h>
+#include <linux/pinctrl/consumer.h>
+#include "../pinctrl/core.h"
+#include <linux/pinctrl/pinctrl.h>
+#include <linux/pinctrl/pinmux.h>
+#include <linux/pinctrl/machine.h>
 
+#define FLED_PINCTRL_STATE_DEFAULT "fled_default"
+#define FLED_PINCTRL_STATE_SLEEP "fled_sleep"
 
 enum sm5701_oper_mode {
         SUSPEND_MODE = 0,
@@ -31,25 +43,35 @@ enum sm5701_oper_mode {
         CHARGING_FLASH_BOOST_MODE
 };
 
+typedef struct SM5701_fled_platform_data {
+        struct pinctrl *fled_pinctrl;
+        struct pinctrl_state *gpio_state_active;
+        struct pinctrl_state *gpio_state_suspend;
+} SM5701_fled_platform_data_t;
+
 struct SM5701_leds_data {
         struct device *dev;
         struct SM5701_dev *iodev;
+        const SM5701_fled_platform_data_t *pdata;
 
         struct led_classdev cdev_flash;
         struct led_classdev cdev_movie;
-        
+
         struct work_struct work_flash;
         struct work_struct work_movie;
 
         u8 br_flash; //IFLED Current in Flash Mode
         u8 br_movie; //IMLED Current in Movie Mode
-        
+
         //struct sm5701_platform_data *pdata;
 
         struct mutex lock;
 };
 
+static SM5701_fled_platform_data_t sm5701_default_fled_pdata;
 static struct i2c_client * leds_sm5701_client = NULL;
+
+extern struct class *camera_class;
 
 #define ENABSTMR_SHIFT  4
 void sm5701_set_enabstmr(int abstmr_enable)
@@ -420,16 +442,22 @@ static ssize_t sm5701_movie_store(struct device *dev,
         ret = kstrtouint(buf, 10, &state);
         if (ret)
                 goto out_strtoint;
-        
-        if (state == 0)
+
+        if (state == 0){
+                sm5701_led_ready(LED_DISABLE);
                 sm5701_set_fleden(SM5701_FLEDEN_DISABLED);
-        else if (state == 1) 
+	}
+        else if (state == 1) {
+                sm5701_led_ready(MOVIE_MODE);
                 sm5701_set_fleden(SM5701_FLEDEN_ON_MOVIE);
-        else 
+	}
+        else {
+                sm5701_led_ready(LED_DISABLE);
                 sm5701_set_fleden(SM5701_FLEDEN_DISABLED);
+	}
 
         //sm5701_dump_register();
-        
+
         return size;
 
 out_strtoint:
@@ -437,7 +465,7 @@ out_strtoint:
         return ret;
 }
 
-static DEVICE_ATTR(movie, S_IWUSR, NULL, sm5701_movie_store);
+static DEVICE_ATTR(rear_flash, S_IWUSR, NULL, sm5701_movie_store);
 
 static void sm5701_deferred_movie_brightness_set(struct work_struct *work)
 {
@@ -478,18 +506,24 @@ static ssize_t sm5701_flash_store(struct device *dev,
         ret = kstrtouint(buf, 10, &state);
         if (ret)
                 goto out_strtoint;
-        
-        if (state == 0)
+
+        if (state == 0) {
+                sm5701_led_ready(LED_DISABLE);
                 sm5701_set_fleden(SM5701_FLEDEN_DISABLED);
-        else if (state == 1) 
+	}
+        else if (state == 1) {
+                sm5701_led_ready(FLASH_MODE);
                 sm5701_set_fleden(SM5701_FLEDEN_ON_FLASH);
-        else 
+	}
+        else {
+                sm5701_led_ready(LED_DISABLE);
                 sm5701_set_fleden(SM5701_FLEDEN_DISABLED);
+	}
 
         //sm5701_dump_register();
 
         return size;
-        
+
 out_strtoint:
         /*dev_err(chip->dev, "%s: fail to change str to int\n", __func__);*/
         return ret;
@@ -544,14 +578,16 @@ static int sm5701_chip_init(struct SM5701_leds_data *chip)
 #define flash_torch_gpio 219
 static int leds_sm5701_probe(struct platform_device *pdev)
 {
-    	struct SM5701_dev *iodev = dev_get_drvdata(pdev->dev.parent);
+        struct SM5701_dev *iodev = dev_get_drvdata(pdev->dev.parent);
         struct SM5701_leds_data *chip;
+        struct SM5701_fled_platform_data *pdata;
 
         int err;
 
         printk("******* %s *******\n",__func__);
+        pdata = &sm5701_default_fled_pdata;
 
-    	chip = kzalloc(sizeof(struct SM5701_leds_data), GFP_KERNEL);        
+        chip = kzalloc(sizeof(struct SM5701_leds_data), GFP_KERNEL);
         if (!chip)
            return -ENOMEM;
 
@@ -561,13 +597,18 @@ static int leds_sm5701_probe(struct platform_device *pdev)
         /*
         if (!(leds_sm5701_client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL))) {
             return -ENOMEM;
-        }    
+        }
         memset(leds_sm5701_client, 0, sizeof(struct i2c_client));
         */
-        leds_sm5701_client = chip->iodev->i2c;    
+        leds_sm5701_client = chip->iodev->i2c;
 
         mutex_init(&chip->lock);
 
+        if (camera_class ==NULL){
+                camera_class = class_create(THIS_MODULE, "camera");
+                if (IS_ERR(camera_class))
+			pr_err("failed to create device cam_dev_rear!\n");
+        }
         /* flash */
         INIT_WORK(&chip->work_flash, sm5701_deferred_flash_brightness_set);
         chip->cdev_flash.name = "flash";
@@ -587,19 +628,19 @@ static int leds_sm5701_probe(struct platform_device *pdev)
                 goto err_create_flash_pin_file;
         }
 
-        /* movie */
-        INIT_WORK(&chip->work_movie, sm5701_deferred_movie_brightness_set);
-        chip->cdev_movie.name = "movie";
-        chip->cdev_movie.max_brightness = 32-1;//0x1f
-        chip->cdev_movie.brightness_set = sm5701_movie_brightness_set;
-        chip->cdev_movie.default_trigger = "movie";
-        err = led_classdev_register((struct device *)
-                                    chip->dev, &chip->cdev_movie);
-        if (err < 0) {
-                dev_err(chip->dev, "failed to register movie\n");
+	/* movie */
+	INIT_WORK(&chip->work_movie, sm5701_deferred_movie_brightness_set);
+	chip->cdev_movie.name = "flash";
+	chip->cdev_movie.max_brightness = 32-1;//0x1f
+	chip->cdev_movie.brightness_set = sm5701_movie_brightness_set;
+	chip->cdev_movie.default_trigger = "flash";
+
+        chip->cdev_movie.dev = device_create(camera_class, NULL, 0, NULL, "flash");
+        if (IS_ERR(chip->cdev_movie.dev)) {
+                pr_err("flash_sysfs: failed to create device(flash)\n");
                 goto err_create_movie_file;
         }
-        err = device_create_file(chip->cdev_movie.dev, &dev_attr_movie);
+        err = device_create_file(chip->cdev_movie.dev, &dev_attr_rear_flash);
         if (err < 0) {
                 dev_err(chip->dev, "failed to create movie file\n");
                 goto err_create_movie_pin_file;
@@ -626,11 +667,36 @@ static int leds_sm5701_probe(struct platform_device *pdev)
         gpio_direction_output(flash_torch_gpio,0);
     #endif
         //sm5701_dump_register();
-      dev_info(chip->dev, "LEDs_SM5701 Probe Done\n");
-      return 0;
+        pdata->fled_pinctrl = devm_pinctrl_get(&pdev->dev);
+        if (IS_ERR_OR_NULL(pdata->fled_pinctrl)) {
+              pr_err("%s:%d Getting pinctrl handle failed\n", __func__, __LINE__);
+              return -EINVAL;
+        }
+
+        pdata->gpio_state_active = pinctrl_lookup_state(pdata->fled_pinctrl, FLED_PINCTRL_STATE_DEFAULT);
+        if (IS_ERR_OR_NULL(pdata->gpio_state_active)) {
+              pr_err("%s:%d Failed to get the active state pinctrl handle\n", __func__, __LINE__);
+              return -EINVAL;
+        }
+
+        pdata->gpio_state_suspend = pinctrl_lookup_state(pdata->fled_pinctrl, FLED_PINCTRL_STATE_SLEEP);
+        if (IS_ERR_OR_NULL(pdata->gpio_state_suspend)) {
+              pr_err("%s:%d Failed to get the active state pinctrl handle\n", __func__, __LINE__);
+              return -EINVAL;
+        }
+
+        err = pinctrl_select_state(pdata->fled_pinctrl, pdata->gpio_state_suspend);
+        if (err) {
+              pr_err("%s:%d cannot set pin to active state", __func__, __LINE__);
+              return err;
+        }
+        pr_err("%s End : X\n", __func__);
+
+        dev_info(chip->dev, "LEDs_SM5701 Probe Done\n");
+        return 0;
 
 err_create_movie_file:
-        device_remove_file(chip->cdev_movie.dev, &dev_attr_movie);
+        device_remove_file(chip->cdev_movie.dev, &dev_attr_rear_flash);
 err_create_movie_pin_file:
         led_classdev_unregister(&chip->cdev_movie);
 err_create_flash_file:
@@ -645,7 +711,7 @@ static int leds_sm5701_remove(struct platform_device *pdev)
 {
         struct SM5701_leds_data *chip = platform_get_drvdata(pdev);
 
-        device_remove_file(chip->cdev_movie.dev, &dev_attr_movie);
+        device_remove_file(chip->cdev_movie.dev, &dev_attr_rear_flash);
         led_classdev_unregister(&chip->cdev_movie);
         flush_work(&chip->work_movie);
         device_remove_file(chip->cdev_flash.dev, &dev_attr_flash);

@@ -957,6 +957,7 @@ static int mdp3_overlay_queue_buffer(struct msm_fb_data_type *mfd,
 	struct mdp3_session_data *mdp3_session = mfd->mdp.private1;
 	struct msmfb_data *img = &req->data;
 	struct mdp3_img_data data;
+	struct mdp3_dma *dma = mdp3_session->dma;
 
 	rc = mdp3_get_img(img, &data);
 	if (rc) {

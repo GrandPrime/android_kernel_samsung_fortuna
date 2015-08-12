@@ -17,15 +17,6 @@
 
 #include <uapi/linux/if_tun.h>
 
-#ifdef CONFIG_KNOX_VPN_UID_PID
-#define TUN_META_HDR	0x0800
-#define TUNGETMETAPARAM _IOR('T', 218, int)
-#define IFF_META_HDR	0x0004
-#define TUN_GET_META_HDR_SZ 0
-#define TUN_GET_META_MARK_OFFSET 1
-#define DEFAULT_IHL 5
-#endif /* CONFIG_KNOX_VPN_UID_PID */
-
 #if defined(CONFIG_TUN) || defined(CONFIG_TUN_MODULE)
 struct socket *tun_get_socket(struct file *);
 #else

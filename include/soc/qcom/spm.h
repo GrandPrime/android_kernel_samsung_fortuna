@@ -25,7 +25,7 @@ enum {
 struct msm_spm_device;
 struct device_node;
 
-#if defined(CONFIG_MSM_SPM_V2)
+#if defined(CONFIG_MSM_SPM)
 
 int msm_spm_set_low_power_mode(unsigned int mode, bool notify_rpm);
 int msm_spm_probe_done(void);
@@ -41,22 +41,24 @@ bool msm_spm_is_mode_avail(unsigned int mode);
 void msm_spm_dump_regs(unsigned int cpu);
 #if defined(CONFIG_MSM_L2_SPM)
 
-int msm_spm_apcs_set_phase(unsigned int phase_cnt);
-int msm_spm_enable_fts_lpm(uint32_t mode);
+/* Public functions */
+
+int msm_spm_apcs_set_phase(int cpu, unsigned int phase_cnt);
+int msm_spm_enable_fts_lpm(int cpu, uint32_t mode);
 
 #else
 
-static inline int msm_spm_apcs_set_phase(unsigned int phase_cnt)
+static inline int msm_spm_apcs_set_phase(int cpu, unsigned int phase_cnt)
 {
 	return -ENOSYS;
 }
 
-static inline int msm_spm_enable_fts_lpm(uint32_t mode)
+static inline int msm_spm_enable_fts_lpm(int cpu, uint32_t mode)
 {
 	return -ENOSYS;
 }
 #endif /* defined(CONFIG_MSM_L2_SPM) */
-#else /* defined(CONFIG_MSM_SPM_V2) */
+#else /* defined(CONFIG_MSM_SPM) */
 static inline int msm_spm_set_low_power_mode(unsigned int mode, bool notify_rpm)
 {
 	return -ENOSYS;
@@ -88,7 +90,7 @@ static inline int msm_spm_device_init(void)
 	return -ENOSYS;
 }
 
-static void msm_spm_dump_regs(unsigned int cpu)
+static inline void msm_spm_dump_regs(unsigned int cpu)
 {
 	return;
 }
@@ -108,5 +110,5 @@ bool msm_spm_is_mode_avail(unsigned int mode)
 	return false;
 }
 
-#endif  /* defined (CONFIG_MSM_SPM_V2) */
+#endif  /* defined (CONFIG_MSM_SPM) */
 #endif  /* __ARCH_ARM_MACH_MSM_SPM_H */

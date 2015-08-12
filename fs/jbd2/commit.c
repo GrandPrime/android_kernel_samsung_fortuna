@@ -35,7 +35,7 @@
 static void journal_end_buffer_io_sync(struct buffer_head *bh, int uptodate)
 {
 	struct buffer_head *orig_bh = bh->b_private;
-
+	
 	BUFFER_TRACE(bh, "");
 	if (uptodate)
 		set_buffer_uptodate(bh);
@@ -43,7 +43,7 @@ static void journal_end_buffer_io_sync(struct buffer_head *bh, int uptodate)
 		clear_buffer_uptodate(bh);
 	if (orig_bh) {
 		clear_bit_unlock(BH_Shadow, &orig_bh->b_state);
-		smp_mb__after_clear_bit();
+		smp_mb__after_atomic();
 		wake_up_bit(&orig_bh->b_state, BH_Shadow);
 	}
 	unlock_buffer(bh);
@@ -239,7 +239,7 @@ static int journal_submit_data_buffers(journal_t *journal,
 		spin_lock(&journal->j_list_lock);
 		J_ASSERT(jinode->i_transaction == commit_transaction);
 		clear_bit(__JI_COMMIT_RUNNING, &jinode->i_flags);
-		smp_mb__after_clear_bit();
+		smp_mb__after_atomic();
 		wake_up_bit(&jinode->i_flags, __JI_COMMIT_RUNNING);
 	}
 	spin_unlock(&journal->j_list_lock);
@@ -277,7 +277,7 @@ static int journal_finish_inode_data_buffers(journal_t *journal,
 		}
 		spin_lock(&journal->j_list_lock);
 		clear_bit(__JI_COMMIT_RUNNING, &jinode->i_flags);
-		smp_mb__after_clear_bit();
+		smp_mb__after_atomic();
 		wake_up_bit(&jinode->i_flags, __JI_COMMIT_RUNNING);
 	}
 
@@ -617,8 +617,8 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 			}
 
 			jbd_debug(4, "JBD2: got buffer %llu (%p)\n",
-				(unsigned long long)descriptor->b_blocknr,
-				descriptor->b_data);
+					(unsigned long long)descriptor->b_blocknr,
+					descriptor->b_data);
 			header = (journal_header_t *)descriptor->b_data;
 			header->h_magic     = cpu_to_be32(JBD2_MAGIC_NUMBER);
 			header->h_blocktype = cpu_to_be32(JBD2_DESCRIPTOR_BLOCK);
@@ -626,7 +626,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 
 			tagp = &descriptor->b_data[sizeof(journal_header_t)];
 			space_left = descriptor->b_size -
-						sizeof(journal_header_t);
+				sizeof(journal_header_t);
 			first_tag = 1;
 			set_buffer_jwrite(descriptor);
 			set_buffer_dirty(descriptor);
@@ -668,7 +668,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 		set_bit(BH_JWrite, &jh2bh(jh)->b_state);
 		JBUFFER_TRACE(jh, "ph3: write metadata");
 		flags = jbd2_journal_write_metadata_buffer(commit_transaction,
-						jh, &wbuf[bufs], blocknr);
+						      jh, &wbuf[bufs], blocknr);
 		if (flags < 0) {
 			jbd2_journal_abort(journal, flags);
 			continue;
@@ -814,9 +814,9 @@ start_journal_io:
 
 	while (!list_empty(&io_bufs)) {
 		struct buffer_head *bh = list_entry(io_bufs.prev,
-						    struct buffer_head,
-						    b_assoc_buffers);
-
+				struct buffer_head,
+				b_assoc_buffers);
+		
 		wait_on_buffer(bh);
 		cond_resched();
 
@@ -855,7 +855,7 @@ start_journal_io:
 	jbd_debug(3, "JBD2: commit phase 4\n");
 
 	/* Here we wait for the revoke record and descriptor record buffers */
-	while (!list_empty(&log_bufs)) {
+	while (!list_empty(&log_bufs)) {	
 		struct buffer_head *bh;
 
 		bh = list_entry(log_bufs.prev, struct buffer_head, b_assoc_buffers);

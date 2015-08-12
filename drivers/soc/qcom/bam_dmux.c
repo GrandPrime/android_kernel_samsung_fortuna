@@ -856,6 +856,11 @@ static void bam_mux_write_done(struct work_struct *work)
 	kfree(info);
 	hdr = (struct bam_mux_hdr *)skb->data;
 	DBG_INC_WRITE_CNT(skb->len);
+	/* Restore skb for client */
+	skb_pull(skb, sizeof(*hdr));
+	if (hdr->pad_len)
+		skb_trim(skb, skb->len - hdr->pad_len);
+
 	event_data = (unsigned long)(skb);
 	spin_lock_irqsave(&bam_ch[hdr->ch_id].lock, flags);
 	bam_ch[hdr->ch_id].num_tx_pkts--;
@@ -2280,7 +2285,7 @@ static int bam_init(void)
 	a2_props.virt_addr = a2_virt_addr;
 	a2_props.virt_size = a2_phys_size;
 	a2_props.irq = a2_bam_irq;
-	a2_props.options = SPS_BAM_OPT_IRQ_WAKEUP;
+	a2_props.options = SPS_BAM_OPT_IRQ_WAKEUP | SPS_BAM_ATMC_MEM;
 	a2_props.num_pipes = A2_NUM_PIPES;
 	a2_props.summing_threshold = A2_SUMMING_THRESHOLD;
 	a2_props.constrained_logging = true;
@@ -2809,7 +2814,7 @@ static ssize_t show_waketime(struct device *dev,
 	if (!bamDmux_pkt_dev)
 		return 0;
 
-	return sprintf(buf, "%u\n", wakelock_timeout);
+	return snprintf(buf, PAGE_SIZE, "%u\n", wakelock_timeout);
 }
 
 static ssize_t store_waketime(struct device *dev,
@@ -2857,7 +2862,8 @@ static int __init bam_dmux_init(void)
 			__func__, dev_attr_waketime.attr.name);
 #endif
 
-	bam_ipc_log_txt = ipc_log_context_create(BAM_IPC_LOG_PAGES, "bam_dmux");
+	bam_ipc_log_txt = ipc_log_context_create(BAM_IPC_LOG_PAGES, "bam_dmux",
+			0);
 	if (!bam_ipc_log_txt) {
 		pr_err("%s : unable to create IPC Logging Context", __func__);
 	}

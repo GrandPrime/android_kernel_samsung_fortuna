@@ -626,6 +626,7 @@ EXPORT_SYMBOL(adf_device_destroy);
  * @type: interface type (see enum @adf_interface_type)
  * @idx: which interface of type @type;
  *	e.g. interface DSI.1 -> @type=%ADF_INTF_TYPE_DSI, @idx=1
+ * @flags: informational flags (bitmask of %ADF_INTF_FLAG_* values)
  * @ops: the interface's associated ops
  * @fmt: formatting string for the display interface's name
  *
@@ -638,11 +639,13 @@ EXPORT_SYMBOL(adf_device_destroy);
  * Returns 0 on success or error code (<0) on failure.
  */
 int adf_interface_init(struct adf_interface *intf, struct adf_device *dev,
-		enum adf_interface_type type, u32 idx,
+		enum adf_interface_type type, u32 idx, u32 flags,
 		const struct adf_interface_ops *ops, const char *fmt, ...)
 {
 	int ret;
 	va_list args;
+	const u32 allowed_flags = ADF_INTF_FLAG_PRIMARY |
+			ADF_INTF_FLAG_EXTERNAL;
 
 	if (dev->n_interfaces == ADF_MAX_INTERFACES) {
 		pr_err("%s: parent device %s has too many interfaces\n",
@@ -652,6 +655,12 @@ int adf_interface_init(struct adf_interface *intf, struct adf_device *dev,
 
 	if (type >= ADF_INTF_MEMORY && type <= ADF_INTF_TYPE_DEVICE_CUSTOM) {
 		pr_err("%s: invalid interface type %u\n", __func__, type);
+		return -EINVAL;
+	}
+
+	if (flags & ~allowed_flags) {
+		pr_err("%s: invalid interface flags 0x%X\n", __func__,
+				flags & ~allowed_flags);
 		return -EINVAL;
 	}
 
@@ -666,7 +675,9 @@ int adf_interface_init(struct adf_interface *intf, struct adf_device *dev,
 
 	intf->type = type;
 	intf->idx = idx;
+	intf->flags = flags;
 	intf->ops = ops;
+	intf->dpms_state = DRM_MODE_DPMS_OFF;
 	init_waitqueue_head(&intf->vsync_wait);
 	rwlock_init(&intf->vsync_lock);
 	rwlock_init(&intf->hotplug_modelist_lock);
@@ -912,6 +923,7 @@ done:
 
 	return ret;
 }
+EXPORT_SYMBOL(adf_attachment_allow);
 
 /**
  * adf_obj_type_str - string representation of an adf_obj_type
@@ -1113,7 +1125,18 @@ void adf_modeinfo_set_name(struct drm_mode_modeinfo *mode)
 		 mode->hdisplay, mode->vdisplay,
 		 interlaced ? "i" : "");
 }
+EXPORT_SYMBOL(adf_modeinfo_set_name);
 
+/**
+ * adf_modeinfo_set_vrefresh - sets the vrefresh of a mode from its other
+ * timing data
+ *
+ * @mode: mode
+ *
+ * adf_modeinfo_set_vrefresh() calculates @mode->vrefresh from
+ * @mode->{h,v}display and @mode->flags.  It is intended to help drivers
+ * create ADF/DRM-style modelists from other mode formats.
+ */
 void adf_modeinfo_set_vrefresh(struct drm_mode_modeinfo *mode)
 {
 	int refresh = 0;
@@ -1139,6 +1162,7 @@ void adf_modeinfo_set_vrefresh(struct drm_mode_modeinfo *mode)
 
 	mode->vrefresh = refresh;
 }
+EXPORT_SYMBOL(adf_modeinfo_set_vrefresh);
 
 static int __init adf_init(void)
 {

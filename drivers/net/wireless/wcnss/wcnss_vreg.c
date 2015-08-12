@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,6 +24,13 @@
 #include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/clk.h>
+#include <linux/unistd.h>
+#include <linux/syscalls.h>
+#include <linux/fcntl.h>
+#include <asm/uaccess.h>
+#include <linux/file.h>
+#include <linux/fs.h>
+#include <linux/stat.h>
 
 
 static void __iomem *msm_wcnss_base;
@@ -34,7 +41,6 @@ static int auto_detect;
 static int is_power_on;
 
 #define RIVA_PMU_OFFSET         0x28
-#define PRONTO_PMU_OFFSET       0x1004
 
 #define RIVA_SPARE_OFFSET       0x0b4
 #define PRONTO_SPARE_OFFSET     0x1088
@@ -42,7 +48,6 @@ static int is_power_on;
 
 #define PRONTO_IRIS_REG_READ_OFFSET       0x1134
 #define PRONTO_IRIS_REG_CHIP_ID           0x04
-
 /* IRIS card chip ID's */
 #define WCN3660       0x0200
 #define WCN3660A      0x0300
@@ -53,7 +58,6 @@ static int is_power_on;
 
 #define WCNSS_PMU_CFG_IRIS_XO_CFG          BIT(3)
 #define WCNSS_PMU_CFG_IRIS_XO_EN           BIT(4)
-#define WCNSS_PMU_CFG_GC_BUS_MUX_SEL_TOP   BIT(5)
 #define WCNSS_PMU_CFG_IRIS_XO_CFG_STS      BIT(6) /* 1: in progress, 0: done */
 
 #define WCNSS_PMU_CFG_IRIS_RESET           BIT(7)
@@ -105,7 +109,7 @@ static struct vregs_info iris_vregs_pronto[] = {
 	{"qcom,iris-vddrfa", VREG_NULL_CONFIG, 1300000, 0,
 		1300000, 100000, NULL},
 	{"qcom,iris-vddpa",  VREG_NULL_CONFIG, 2900000, 0,
-		3000000, 515000, NULL},
+		3350000, 515000, NULL},
 	{"qcom,iris-vdddig", VREG_NULL_CONFIG, 1225000, 0,
 		1800000, 10000,  NULL},
 };
@@ -152,7 +156,8 @@ struct host_driver {
 
 enum {
 	IRIS_3660, /* also 3660A and 3680 */
-	IRIS_3620
+	IRIS_3620,
+	IRIS_3610
 };
 
 
@@ -165,6 +170,9 @@ int xo_auto_detect(u32 reg)
 		return WCNSS_XO_48MHZ;
 
 	case IRIS_3620:
+		return WCNSS_XO_19MHZ;
+
+	case IRIS_3610:
 		return WCNSS_XO_19MHZ;
 
 	default:
@@ -205,7 +213,61 @@ void  wcnss_iris_reset(u32 reg, void __iomem *pmu_conf_reg)
 	reg &= ~WCNSS_PMU_CFG_IRIS_RESET;
 	writel_relaxed(reg, pmu_conf_reg);
 }
+static void chipset_version(u32 reg)
+{
+	struct file *file;
+	loff_t pos = 0;
+	int fd;
+	u32 chipset_id;
+	char chipset[15];
 
+	mm_segment_t old_fs = get_fs();
+
+	chipset_id = reg >> 16;
+
+	switch (chipset_id) {
+	case WCN3660:
+		memcpy(chipset, "WCN3660", sizeof("WCN3660"));
+		break;
+	case WCN3660A:
+		memcpy(chipset, "WCN3660A", sizeof("WCN3660A"));
+		break;
+	case WCN3660B:
+		memcpy(chipset, "WCN3660B", sizeof("WCN3660B"));
+		break;
+	case WCN3620:
+		memcpy(chipset, "WCN3620", sizeof("WCN3620"));
+		break;
+	case WCN3620A:
+		memcpy(chipset, "WCN3620A", sizeof("WCN3620A"));
+		break;
+	case WCN3610:
+		memcpy(chipset, "WCN3610", sizeof("WCN3610"));
+		break;
+	}
+
+	pr_info("wcnss: chipset: %s\n", chipset);
+
+	set_fs(KERNEL_DS);
+	fd = sys_open("/data/.wifichipset.info", O_RDWR | O_CREAT | O_TRUNC, 0644);
+
+	if(fd >=0){
+		file = fget(fd);
+		sys_fchmod(fd, 0644);
+
+		if(file){
+			vfs_write(file, chipset, strlen(chipset), &pos);
+			fput(file);
+		}
+		sys_close(fd);
+	}
+	else {
+		pr_err("Couldn't open /data/.wifichipset.info\n");
+	}
+	set_fs(old_fs);
+
+	return;
+}
 static int
 configure_iris_xo(struct device *dev,
 			struct wcnss_wlan_config *cfg,
@@ -299,9 +361,9 @@ configure_iris_xo(struct device *dev,
 						WCNSS_PMU_CFG_IRIS_XO_READ_STS)
 					cpu_relax();
 
-				iris_reg = readl_relaxed(iris_read_reg);
-				pr_info("wcnss: IRIS Reg: %08x\n", iris_reg);
-
+			iris_reg = readl_relaxed(iris_read_reg);
+			pr_info("wcnss: IRIS Reg: %08x\n", iris_reg);
+			chipset_version(iris_reg);
 				if (validate_iris_chip_id(iris_reg) && i >= 4) {
 					pr_info("wcnss: IRIS Card absent/invalid\n");
 					auto_detect = WCNSS_XO_INVALID;
@@ -712,4 +774,3 @@ int wcnss_free_power_on_lock(char *driver_name)
 	return ret;
 }
 EXPORT_SYMBOL(wcnss_free_power_on_lock);
-

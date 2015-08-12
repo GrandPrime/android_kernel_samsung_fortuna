@@ -43,6 +43,7 @@ struct msm_spm_device {
 	uint32_t cpu_vdd;
 	struct cpumask mask;
 	void __iomem *q2s_reg;
+	bool qchannel_ignore;
 };
 
 struct msm_spm_vdd_info {
@@ -169,7 +170,7 @@ static void msm_spm_config_q2s(struct msm_spm_device *dev, unsigned int mode)
 		break;
 	case MSM_SPM_MODE_GDHS:
 	case MSM_SPM_MODE_POWER_COLLAPSE:
-		qchannel_ignore = 1;
+		qchannel_ignore = dev->qchannel_ignore;
 		spm_legacy_mode = 1;
 		break;
 	default:
@@ -394,12 +395,12 @@ int msm_spm_config_low_power_mode(struct msm_spm_device *dev,
 
 /**
  * msm_spm_apcs_set_phase(): Set number of SMPS phases.
- * phase_cnt: Number of phases to be set active
+ * @cpu: cpu which is requesting the change in number of phases.
+ * @phase_cnt: Number of phases to be set active
  */
-int msm_spm_apcs_set_phase(unsigned int phase_cnt)
+int msm_spm_apcs_set_phase(int cpu, unsigned int phase_cnt)
 {
-	struct msm_spm_device *dev = per_cpu(cpu_vctl_device,
-			raw_smp_processor_id());
+	struct msm_spm_device *dev = per_cpu(cpu_vctl_device, cpu);
 
 	if (!dev)
 		return -ENXIO;
@@ -411,12 +412,12 @@ EXPORT_SYMBOL(msm_spm_apcs_set_phase);
 
 /** msm_spm_enable_fts_lpm() : Enable FTS to switch to low power
  *                             when the cores are in low power modes
+ * @cpu: cpu that is entering low power mode.
  * @mode: The mode configuration for FTS
  */
-int msm_spm_enable_fts_lpm(uint32_t mode)
+int msm_spm_enable_fts_lpm(int cpu, uint32_t mode)
 {
-	struct msm_spm_device *dev = per_cpu(cpu_vctl_device,
-			raw_smp_processor_id());
+	struct msm_spm_device *dev = per_cpu(cpu_vctl_device, cpu);
 
 	if (!dev)
 		return -ENXIO;
@@ -623,6 +624,17 @@ static int msm_spm_dev_probe(struct platform_device *pdev)
 			goto fail;
 		}
 	}
+
+	key = "qcom,use-qchannel-for-pc";
+	dev->qchannel_ignore = !of_property_read_bool(node, key);
+
+	/*
+	 * At system boot, cpus and or clusters can remain in reset. CCI SPM
+	 * will not be triggered unless SPM_LEGACY_MODE bit is set for the
+	 * cluster in reset. Initialize q2s registers and set the
+	 * SPM_LEGACY_MODE bit.
+	 */
+	msm_spm_config_q2s(dev, MSM_SPM_MODE_POWER_COLLAPSE);
 
 	for (i = 0; i < ARRAY_SIZE(spm_of_data); i++) {
 		ret = of_property_read_u32(node, spm_of_data[i].key, &val);

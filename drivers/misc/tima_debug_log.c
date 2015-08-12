@@ -9,10 +9,13 @@
 #include <linux/io.h>
 #include <linux/types.h>
 
+#if defined(CONFIG_SEC_ROSSA_PROJECT)
 #define DEBUG_LOG_START (0x85F80000)
-//#endif
+#else
+#define DEBUG_LOG_START (0x85D80000)
+#endif
 
-#define	DEBUG_LOG_SIZE	(1<<18)
+#define	DEBUG_LOG_SIZE	(1<<19)
 #define	DEBUG_LOG_MAGIC	(0xaabbccdd)
 #define	DEBUG_LOG_ENTRY_SIZE	128
 typedef struct debug_log_entry_s

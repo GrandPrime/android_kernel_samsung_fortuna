@@ -20,7 +20,6 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
-#include <linux/clk.h>
 #include <linux/types.h>
 #include <linux/uaccess.h>
 #include <linux/of.h>
@@ -30,7 +29,6 @@
 #include <soc/qcom/camera2.h>
 #include <media/msm_cam_sensor.h>
 #include <media/v4l2-subdev.h>
-#include <media/v4l2-ioctl.h>
 #include "msm_camera_i2c.h"
 #include "msm_camera_dt_util.h"
 #include "msm_sd.h"
@@ -47,17 +45,12 @@ enum msm_sensor_state_t {
 
 struct msm_sensor_fn_t {
 	int (*sensor_config) (struct msm_sensor_ctrl_t *, void __user *);
-#ifdef CONFIG_COMPAT
-	int (*sensor_config32) (struct msm_sensor_ctrl_t *, void __user *);
-#endif
 	int (*sensor_power_down) (struct msm_sensor_ctrl_t *);
 	int (*sensor_power_up) (struct msm_sensor_ctrl_t *);
 	int (*sensor_match_id) (struct msm_sensor_ctrl_t *);
-#ifdef CONFIG_MACH_YULONG
-	int (*sensor_prepare_otp)(struct msm_sensor_ctrl_t *s_ctrl);
-	int (*sensor_update_otp) (struct msm_sensor_ctrl_t *);
-#endif
+	int (*sensor_native_control) (struct msm_sensor_ctrl_t *, void __user *);
 };
+
 
 struct msm_sensor_ctrl_t {
 	struct platform_device *pdev;
@@ -83,15 +76,9 @@ struct msm_sensor_ctrl_t {
 	struct device_node *of_node;
 	enum msm_camera_stream_type_t camera_stream_type;
 	uint32_t set_mclk_23880000;
-#ifdef CONFIG_MACH_YULONG
-	uint32_t module_id;
-#endif
 };
 
 int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp);
-#ifdef CONFIG_MACH_YULONG
-int msm_sensor_config32(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp);
-#endif
 
 int msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl);
 
@@ -123,14 +110,4 @@ int32_t msm_sensor_get_dt_gpio_set_tbl(struct device_node *of_node,
 int32_t msm_sensor_init_gpio_pin_tbl(struct device_node *of_node,
 	struct msm_camera_gpio_conf *gconf, uint16_t *gpio_array,
 	uint16_t gpio_array_size);
-#ifdef CONFIG_COMPAT
-long msm_sensor_subdev_fops_ioctl(struct file *file,
-	unsigned int cmd,
-	unsigned long arg);
-#endif
-
-#ifdef CONFIG_MACH_YULONG
-bool msm_sensor_is_probed(int position);
-#endif
-
 #endif

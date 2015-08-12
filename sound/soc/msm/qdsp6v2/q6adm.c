@@ -1599,6 +1599,7 @@ static struct cal_block_data *adm_find_cal_by_path(int cal_index, int path)
 	return NULL;
 }
 
+#ifdef ADM_CAL_BY_APP_TYPE_USE
 static struct cal_block_data *adm_find_cal_by_app_type(int cal_index, int path,
 								int app_type)
 {
@@ -1630,7 +1631,7 @@ static struct cal_block_data *adm_find_cal_by_app_type(int cal_index, int path,
 		__func__, cal_index, path, app_type);
 	return adm_find_cal_by_path(cal_index, path);
 }
-
+#endif
 
 static struct cal_block_data *adm_find_cal(int cal_index, int path,
 					   int app_type, int acdb_id,
@@ -1665,7 +1666,13 @@ static struct cal_block_data *adm_find_cal(int cal_index, int path,
 	}
 	pr_debug("%s: Can't find ADM cal for cal_index %d, path %d, app %d, acdb_id %d sample_rate %d defaulting to search by app type\n",
 		__func__, cal_index, path, app_type, acdb_id, sample_rate);
+
+#ifdef ADM_CAL_BY_APP_TYPE_USE
 	return adm_find_cal_by_app_type(cal_index, path, app_type);
+#else
+	return adm_find_cal_by_path(cal_index, path);
+#endif
+
 }
 
 static void send_adm_cal_type(int cal_index, int path, int port_id,
@@ -1841,7 +1848,10 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 
 	if ((topology == VPM_TX_SM_ECNS_COPP_TOPOLOGY) ||
 	    (topology == VPM_TX_DM_FLUENCE_COPP_TOPOLOGY) ||
-	    (topology == VPM_TX_DM_RFECNS_COPP_TOPOLOGY))
+	    (topology == VPM_TX_DM_RFECNS_COPP_TOPOLOGY) ||
+		/* LVVE for Barge-in */
+	    (topology == 0x1000BFF0) ||
+	    (topology == 0x1000BFF1))
 		rate = 16000;
 
 	copp_idx = adm_get_idx_if_copp_exists(port_idx, topology, perf_mode,
@@ -1931,7 +1941,7 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 		}
 
 		open.topology_id = topology;
-
+		
 		open.dev_num_channel = channel_mode & 0x00FF;
 		open.bit_width = bit_width;
 		WARN_ON((perf_mode == ULTRA_LOW_LATENCY_PCM_MODE) &&
@@ -1951,14 +1961,14 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 		} else if (channel_mode == 4) {
 			open.dev_channel_mapping[0] = PCM_CHANNEL_FL;
 			open.dev_channel_mapping[1] = PCM_CHANNEL_FR;
-			open.dev_channel_mapping[2] = PCM_CHANNEL_LS;
-			open.dev_channel_mapping[3] = PCM_CHANNEL_RS;
+			open.dev_channel_mapping[2] = PCM_CHANNEL_RB;
+			open.dev_channel_mapping[3] = PCM_CHANNEL_LB;
 		} else if (channel_mode == 5) {
 			open.dev_channel_mapping[0] = PCM_CHANNEL_FL;
 			open.dev_channel_mapping[1] = PCM_CHANNEL_FR;
 			open.dev_channel_mapping[2] = PCM_CHANNEL_FC;
-			open.dev_channel_mapping[3] = PCM_CHANNEL_LS;
-			open.dev_channel_mapping[4] = PCM_CHANNEL_RS;
+			open.dev_channel_mapping[3] = PCM_CHANNEL_LB;
+			open.dev_channel_mapping[4] = PCM_CHANNEL_RB;
 		} else if (channel_mode == 6) {
 			open.dev_channel_mapping[0] = PCM_CHANNEL_FL;
 			open.dev_channel_mapping[1] = PCM_CHANNEL_FR;
@@ -1971,10 +1981,10 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 			open.dev_channel_mapping[1] = PCM_CHANNEL_FR;
 			open.dev_channel_mapping[2] = PCM_CHANNEL_LFE;
 			open.dev_channel_mapping[3] = PCM_CHANNEL_FC;
-			open.dev_channel_mapping[4] = PCM_CHANNEL_LS;
-			open.dev_channel_mapping[5] = PCM_CHANNEL_RS;
-			open.dev_channel_mapping[6] = PCM_CHANNEL_LB;
-			open.dev_channel_mapping[7] = PCM_CHANNEL_RB;
+			open.dev_channel_mapping[4] = PCM_CHANNEL_LB;
+			open.dev_channel_mapping[5] = PCM_CHANNEL_RB;
+			open.dev_channel_mapping[6] = PCM_CHANNEL_FLC;
+			open.dev_channel_mapping[7] = PCM_CHANNEL_FRC;
 		} else {
 			pr_err("%s: invalid num_chan %d\n", __func__,
 					channel_mode);
@@ -2125,9 +2135,7 @@ int adm_matrix_map(int path, struct route_payload payload_map, int perf_mode)
 					    atomic_read(&this_adm.copp.id
 							[port_idx][copp_idx]),
 					    get_cal_path(path),
-					    payload_map.session_id,
-					    payload_map.app_type,
-					    payload_map.acdb_dev_id);
+					    payload_map.session_id);
 			send_adm_cal(payload_map.port_id[i], copp_idx,
 				     get_cal_path(path), perf_mode,
 				     payload_map.app_type,

@@ -1,12 +1,10 @@
-START_TIME=$SECONDS
+#!/bin/bash
 
-rm -fr out
 export ARCH=arm
-mkdir $(pwd)/out
-make -j$(cat /proc/cpuinfo | grep processor | wc -l) -C $(pwd) O=$(pwd)/out msm8916_sec_defconfig VARIANT_DEFCONFIG=msm8916_sec_fortuna_aio_defconfig DEBUG_DEFCONFIG= SELINUX_DEFCONFIG=selinux_defconfig SELINUX_LOG_DEFCONFIG= TIMA_DEFCONFIG= 
-make -j$(cat /proc/cpuinfo | grep processor | wc -l) -C $(pwd) O=$(pwd)/out
-cp $(pwd)/out/arch/arm/boot/zImage $(pwd)/arch/arm/boot/zImage
+export CROSS_COMPILE=/opt/toolchains/arm-eabi-4.7/bin/arm-eabi-
+mkdir output
 
-ELAPSED_TIME=$(($SECONDS - $START_TIME))
+make -C $(pwd) O=output VARIANT_DEFCONFIG=msm8916_sec_fortuna_canopen_defconfig msm8916_sec_defconfig SELINUX_DEFCONFIG=selinux_defconfig
+make -C $(pwd) O=output
 
-echo -e "\t$(($ELAPSED_TIME/60)) min $(($ELAPSED_TIME%60)) sec"
+cp output/arch/arm/boot/Image $(pwd)/arch/arm/boot/zImage

@@ -22,7 +22,7 @@
 #include <drm/drm_mode.h>
 
 #define ADF_NAME_LEN 32
-#define ADF_MAX_CUSTOM_DATA_SIZE PAGE_SIZE
+#define ADF_MAX_CUSTOM_DATA_SIZE 4096
 
 enum adf_interface_type {
 	ADF_INTF_DSI = 0,
@@ -35,6 +35,9 @@ enum adf_interface_type {
 	ADF_INTF_TYPE_DEVICE_CUSTOM = 128,
 	ADF_INTF_TYPE_MAX = (~(__u32)0),
 };
+
+#define ADF_INTF_FLAG_PRIMARY (1 << 0)
+#define ADF_INTF_FLAG_EXTERNAL (1 << 1)
 
 enum adf_event_type {
 	ADF_EVENT_VSYNC = 0,
@@ -80,7 +83,7 @@ struct adf_event {
  */
 struct adf_vsync_event {
 	struct adf_event base;
-	__u64 timestamp;
+	__aligned_u64 timestamp;
 };
 
 /**
@@ -116,14 +119,14 @@ struct adf_buffer_config {
 	__u32 h;
 	__u32 format;
 
-	__s64 fd[ADF_MAX_PLANES];
+	__s32 fd[ADF_MAX_PLANES];
 	__u32 offset[ADF_MAX_PLANES];
 	__u32 pitch[ADF_MAX_PLANES];
 	__u8 n_planes;
 
-	__s64 acquire_fence;
+	__s32 acquire_fence;
 };
-#define ADF_MAX_BUFFERS (PAGE_SIZE / sizeof(struct adf_buffer_config))
+#define ADF_MAX_BUFFERS (4096 / sizeof(struct adf_buffer_config))
 
 /**
  * struct adf_post_config - request to flip to a new set of buffers
@@ -147,9 +150,9 @@ struct adf_post_config {
 	size_t custom_data_size;
 	void __user *custom_data;
 
-	__s64 complete_fence;
+	__s32 complete_fence;
 };
-#define ADF_MAX_INTERFACES (PAGE_SIZE / sizeof(__u32))
+#define ADF_MAX_INTERFACES (4096 / sizeof(__u32))
 
 /**
  * struct adf_simple_buffer_allocate - request to allocate a "simple" buffer
@@ -177,7 +180,7 @@ struct adf_simple_buffer_alloc {
 	__u16 h;
 	__u32 format;
 
-	__s64 fd;
+	__s32 fd;
 	__u32 offset;
 	__u32 pitch;
 };
@@ -192,7 +195,7 @@ struct adf_simple_buffer_alloc {
  */
 struct adf_simple_post_config {
 	struct adf_buffer_config buf;
-	__s64 complete_fence;
+	__s32 complete_fence;
 };
 
 /**
@@ -230,7 +233,7 @@ struct adf_device_data {
 	size_t custom_data_size;
 	void __user *custom_data;
 };
-#define ADF_MAX_ATTACHMENTS (PAGE_SIZE / sizeof(struct adf_attachment))
+#define ADF_MAX_ATTACHMENTS (4096 / sizeof(struct adf_attachment_config))
 
 /**
  * struct adf_device_data - describes a display interface
@@ -239,6 +242,7 @@ struct adf_device_data {
  * @type: interface type (see enum @adf_interface_type)
  * @id: which interface of type @type;
  *	e.g. interface DSI.1 -> @type=@ADF_INTF_TYPE_DSI, @id=1
+ * @flags: informational flags (bitmask of %ADF_INTF_FLAG_* values)
  * @dpms_state: DPMS state (one of @DRM_MODE_DPMS_* defined in drm_mode.h)
  * @hotplug_detect: whether a display is plugged in
  * @width_mm: screen width in millimeters, or 0 if unknown
@@ -255,6 +259,7 @@ struct adf_interface_data {
 	__u32 type;
 	__u32 id;
 	/* e.g. type=ADF_INTF_TYPE_DSI, id=1 => DSI.1 */
+	__u32 flags;
 
 	__u8 dpms_state;
 	__u8 hotplug_detect;
@@ -268,7 +273,7 @@ struct adf_interface_data {
 	size_t custom_data_size;
 	void __user *custom_data;
 };
-#define ADF_MAX_MODES (PAGE_SIZE / sizeof(struct drm_mode_modeinfo))
+#define ADF_MAX_MODES (4096 / sizeof(struct drm_mode_modeinfo))
 
 /**
  * struct adf_overlay_engine_data - describes an overlay engine
@@ -288,19 +293,29 @@ struct adf_overlay_engine_data {
 	size_t custom_data_size;
 	void __user *custom_data;
 };
-#define ADF_MAX_SUPPORTED_FORMATS (PAGE_SIZE / sizeof(__u32))
+#define ADF_MAX_SUPPORTED_FORMATS (4096 / sizeof(__u32))
 
-#define ADF_SET_EVENT		_IOW('D', 0, struct adf_set_event)
-#define ADF_BLANK		_IOW('D', 1, __u8)
-#define ADF_POST_CONFIG		_IOW('D', 2, struct adf_post_config)
-#define ADF_SET_MODE		_IOW('D', 3, struct drm_mode_modeinfo)
-#define ADF_GET_DEVICE_DATA	_IOR('D', 4, struct adf_device_data)
-#define ADF_GET_INTERFACE_DATA	_IOR('D', 5, struct adf_interface_data)
+#define ADF_IOCTL_TYPE		'D'
+#define ADF_IOCTL_NR_CUSTOM	128
+
+#define ADF_SET_EVENT		_IOW(ADF_IOCTL_TYPE, 0, struct adf_set_event)
+#define ADF_BLANK		_IOW(ADF_IOCTL_TYPE, 1, __u8)
+#define ADF_POST_CONFIG		_IOW(ADF_IOCTL_TYPE, 2, struct adf_post_config)
+#define ADF_SET_MODE		_IOW(ADF_IOCTL_TYPE, 3, \
+					struct drm_mode_modeinfo)
+#define ADF_GET_DEVICE_DATA	_IOR(ADF_IOCTL_TYPE, 4, struct adf_device_data)
+#define ADF_GET_INTERFACE_DATA	_IOR(ADF_IOCTL_TYPE, 5, \
+					struct adf_interface_data)
 #define ADF_GET_OVERLAY_ENGINE_DATA \
-				_IOR('D', 6, struct adf_overlay_engine_data)
-#define ADF_SIMPLE_POST_CONFIG	_IOW('D', 7, struct adf_simple_post_config)
-#define ADF_SIMPLE_BUFFER_ALLOC	_IOW('D', 8, struct adf_simple_buffer_alloc)
-#define ADF_ATTACH		_IOW('D', 9, struct adf_attachment_config)
-#define ADF_DETACH		_IOW('D', 10, struct adf_attachment_config)
+				_IOR(ADF_IOCTL_TYPE, 6, \
+					struct adf_overlay_engine_data)
+#define ADF_SIMPLE_POST_CONFIG	_IOW(ADF_IOCTL_TYPE, 7, \
+					struct adf_simple_post_config)
+#define ADF_SIMPLE_BUFFER_ALLOC	_IOW(ADF_IOCTL_TYPE, 8, \
+					struct adf_simple_buffer_alloc)
+#define ADF_ATTACH		_IOW(ADF_IOCTL_TYPE, 9, \
+					struct adf_attachment_config)
+#define ADF_DETACH		_IOW(ADF_IOCTL_TYPE, 10, \
+					struct adf_attachment_config)
 
 #endif /* _UAPI_VIDEO_ADF_H_ */

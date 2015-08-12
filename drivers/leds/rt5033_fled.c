@@ -41,6 +41,7 @@
 #define FLED_PINCTRL_STATE_DEFAULT "fled_default"
 #define FLED_PINCTRL_STATE_SLEEP "fled_sleep"
 
+
 #define RT5033_FLED_PIN_CTRL (1<<4)
 
 #define EN_FLED_IRQ 0
@@ -87,15 +88,13 @@ static int rt5033_set_fled_osc_en(struct i2c_client *iic, int en)
     return (en?rt5033_set_bits:rt5033_clr_bits)(iic, 0x1a, (1 << 5));
 }
 
-#if 1 //LED
 static ssize_t flash_store(struct device *dev, struct device_attribute *attr,
                          const char *buf, size_t count)
 {
 	int sel = 0;
 	rt_fled_info_t *fled_info = rt_fled_get_info_by_name(NULL);
 
-	if(*buf == '0') {
-		rear_flash_status = 0;
+	if(!strncmp(buf, "0", 1)){
 		assistive_light = false;
 		pr_err("Torch Low\n");
 		gpio_request(led_irq_gpio1, NULL);
@@ -104,37 +103,23 @@ static ssize_t flash_store(struct device *dev, struct device_attribute *attr,
 		gpio_direction_output(led_irq_gpio2, 0);
 		gpio_free(led_irq_gpio1);
 		gpio_free(led_irq_gpio2);
-	}
-	else if(!strncmp(buf, "100", 3)){
-		pr_err("Torch Factory-O\n");
+	} else if(!strncmp(buf, "100", 3)){
+		pr_err("Torch Factory\n");
 		gpio_request(led_irq_gpio1, NULL);
 		gpio_direction_output(led_irq_gpio1, 1);
 		gpio_free(led_irq_gpio1);
 		if (fled_info)
 			sel = rt5033_fled_set_torch_current_sel(fled_info, 7);
-	}
-	else if(!strncmp(buf, "1", 1)){
+	} else if(!strncmp(buf, "1", 1)){
 		assistive_light = true;
-		rear_flash_status = 1;
-		pr_err("Torch HIGH : led_irq_gpio1(%d)_irq_gpio2(%d)\n", led_irq_gpio1, led_irq_gpio2);
-		
+		pr_err("Torch HIGH\n");
 		if (fled_info)
 			sel = rt5033_fled_set_torch_current_sel(fled_info, 2);
-		
 		gpio_request(led_irq_gpio1, NULL);
 		gpio_direction_output(led_irq_gpio1, 1);
 		gpio_free(led_irq_gpio1);
-	}
-	else if(!strncmp(buf, "8", 1)){
-		pr_err("Torch Factory : led_irq_gpio1(%d)_irq_gpio2(%d)\n", led_irq_gpio1, led_irq_gpio2);
-		gpio_request(led_irq_gpio1, NULL);
-		gpio_direction_output(led_irq_gpio1, 1);
-		gpio_free(led_irq_gpio1);
-		if (fled_info)
-			sel = rt5033_fled_set_torch_current_sel(fled_info, 7);
-	}
-	else {
-		pr_err("No Torch : led_irq_gpio1(%d)_irq_gpio2(%d)\n", led_irq_gpio1, led_irq_gpio2);
+	} else { //'8' is not setted.
+		pr_err("No Torch\n");
 	}
 
 	return count;
@@ -145,6 +130,8 @@ static DEVICE_ATTR(rear_flash, S_IWUSR|S_IWGRP, NULL, flash_store);
 int create_flash_sysfs(void)
 {
     int err = -ENODEV;
+
+    pr_err("flash_sysfs: sysfs test!!!! (%s)\n",__func__);
 
     if (IS_ERR_OR_NULL(camera_class)) {
         pr_err("flash_sysfs: error, camera class not exist");
@@ -164,7 +151,6 @@ int create_flash_sysfs(void)
     }
     return 0;
 }
-#endif
 
 #ifdef CONFIG_CHARGER_RT5033
 extern int rt5033_chg_fled_init(struct i2c_client *client);
@@ -332,8 +318,8 @@ int32_t rt5033_charger_notification(struct rt_fled_info *fled_info,
 	 * To fix flicking issue for torch while TA is removing
 	 */
 	if (force_torch_en) {
-	usleep(2500);
-	rt5033_clr_bits(info->i2c_client, 0x1a, 0x80);
+		usleep(2500);
+		rt5033_clr_bits(info->i2c_client, 0x1a, 0x80);
 	}
 	RT5033_FLED_INFO("force_torch_en = %d\n",
 			force_torch_en);
@@ -360,6 +346,7 @@ int32_t rt5033_charger_notification(struct rt_fled_info *fled_info,
 		}
 	rt5033_fled_set_ta_status(info->i2c_client, attach);
 	rt5033_set_uug_status(info->i2c_client, attach ? 0x02 : 0x00);
+
 	if (mode == FLASHLIGHT_MODE_TORCH || mode == FLASHLIGHT_MODE_MIXED) {
 		/* disable FlashEN and then enable it*/
 		rt5033_assign_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x81, 0x0);
@@ -413,25 +400,25 @@ static int rt5033_fled_set_mode(struct rt_fled_info *fled_info,
 	}
 	rt5033_fled_lock(fled_info);
 	switch (mode) {
-		case FLASHLIGHT_MODE_OFF:
-			rt5033_clr_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x80);
-			usleep_range(500, 1000);
-			rt5033_clr_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x01);
-			rt5033_set_fled_osc_en(info->i2c_client, 0);
+	case FLASHLIGHT_MODE_OFF:
+		rt5033_clr_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x80);
+		usleep_range(500, 1000);
+		rt5033_clr_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x01);
+		rt5033_set_fled_osc_en(info->i2c_client, 0);
 
-			break;
-		case FLASHLIGHT_MODE_TORCH:
-		case FLASHLIGHT_MODE_MIXED:
-			rt5033_clr_bits(info->i2c_client, RT5033_FLED_FUNCTION1, 0x04);
-			rt5033_assign_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x81, 0x1);
-			break;
-		case FLASHLIGHT_MODE_FLASH:
-			rt5033_assign_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x81, 0x0);
-			rt5033_set_bits(info->i2c_client, RT5033_FLED_FUNCTION1, 0x04);
-			rt5033_assign_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x81, 0x1);
-			break;
-		default:
-			return -EINVAL;
+		break;
+	case FLASHLIGHT_MODE_TORCH:
+	case FLASHLIGHT_MODE_MIXED:
+		rt5033_clr_bits(info->i2c_client, RT5033_FLED_FUNCTION1, 0x04);
+		rt5033_assign_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x81, 0x1);
+		break;
+	case FLASHLIGHT_MODE_FLASH:
+		rt5033_assign_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x81, 0x0);
+		rt5033_set_bits(info->i2c_client, RT5033_FLED_FUNCTION1, 0x04);
+		rt5033_assign_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x81, 0x1);
+		break;
+	default:
+		return -EINVAL;
 	}
 	rt5033_fled_unlock(fled_info);
 	info->base.flashlight_dev->props.mode = mode;
@@ -471,20 +458,20 @@ static int rt5033_fled_strobe(struct rt_fled_info *fled_info)
 		rt5033_set_uug_status(info->i2c_client, 0);
 	}
 	switch (info->base.flashlight_dev->props.mode) {
-		case FLASHLIGHT_MODE_FLASH:
-			rt5033_set_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x81);
-			break;
-		case FLASHLIGHT_MODE_MIXED:
-			rt5033_assign_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x81, 0x1);
-			rt5033_set_bits(info->i2c_client, RT5033_FLED_FUNCTION1, 0x04);
-			rt5033_clr_bits(info->i2c_client, RT5033_FLED_CONTROL2,
-					(1 << 7)); // DISABLE AUTO TRACK
+	case FLASHLIGHT_MODE_FLASH:
 		rt5033_set_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x81);
-			break;
-		default:
-			RT5033_FLED_ERR("Error : not flash / mixed mode\n");
-			ret = -EINVAL;
-			break;
+		break;
+	case FLASHLIGHT_MODE_MIXED:
+		rt5033_assign_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x81, 0x1);
+		rt5033_set_bits(info->i2c_client, RT5033_FLED_FUNCTION1, 0x04);
+		rt5033_clr_bits(info->i2c_client, RT5033_FLED_CONTROL2,
+				(1 << 7)); // DISABLE AUTO TRACK
+		rt5033_set_bits(info->i2c_client, RT5033_FLED_FUNCTION2, 0x81);
+		break;
+	default:
+		RT5033_FLED_ERR("Error : not flash / mixed mode\n");
+		ret = -EINVAL;
+            break;
 	}
 	return ret;
 }
@@ -705,7 +692,7 @@ static int rt5033_fled_get_strobe_timeout_sel(struct rt_fled_info *fled_info)
 	return rc & 0x3f;
 }
 
-static void rt5033_fled_shutdown(struct rt_fled_info *info)
+void rt5033_fled_shutdown(struct rt_fled_info *info)
 {
 	flashlight_set_mode(info->flashlight_dev, FLASHLIGHT_MODE_OFF);
 	return;
@@ -738,7 +725,7 @@ static struct rt_fled_hal rt5033_fled_hal = {
 	.fled_get_lv_protection_sel = rt5033_fled_get_lv_protection_sel,
 	.fled_get_strobe_timeout_sel = rt5033_fled_get_strobe_timeout_sel,
 	/* PM shutdown, optional */
-	.fled_shutdown = rt5033_fled_shutdown,
+	.fled_shutdown = NULL, //rt5033_fled_shutdown,
 
 };
 
@@ -944,8 +931,8 @@ static int rt5033_fled_probe(struct platform_device *pdev)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
 	if (pdev->dev.parent->of_node) {
 		pdev->dev.of_node = of_find_compatible_node(
-					    of_node_get(pdev->dev.parent->of_node), NULL,
-					    rt5033_fled_match_table[0].compatible);
+				of_node_get(pdev->dev.parent->of_node), NULL,
+				rt5033_fled_match_table[0].compatible);
 	}
 #endif
 #endif
@@ -991,52 +978,49 @@ static int rt5033_fled_probe(struct platform_device *pdev)
 
 	}
 
-#if 1 //LED
 	led_irq_gpio1 = of_get_named_gpio(pdev->dev.of_node, "rt5033,led1-gpio", 0);
-		pr_err("led1-gpio:%d\n", led_irq_gpio1);
+	pr_err("led1-gpio:%d\n", led_irq_gpio1);
 	if (led_irq_gpio1 < 0) {
 		pr_err("can't get led1-gpio\n");
 		return -EINVAL;
 	}
 
 	led_irq_gpio2 = of_get_named_gpio(pdev->dev.of_node, "rt5033,led2-gpio", 0);
-		pr_err("led2-gpio:%d\n", led_irq_gpio2);
+	pr_err("led2-gpio:%d\n", led_irq_gpio2);
 	if (led_irq_gpio2 < 0) {
 		pr_err("can't get led2-gpio\n");
 		return -EINVAL;
-    }
-    /* Create Samsung Flash Sysfs */
-    create_flash_sysfs();
-#endif
+	}
+	/* Create Samsung Flash Sysfs */
+	create_flash_sysfs();
 
-    pdata->fled_pinctrl = devm_pinctrl_get(&pdev->dev);
-    if (IS_ERR_OR_NULL(pdata->fled_pinctrl)) {
+	pdata->fled_pinctrl = devm_pinctrl_get(&pdev->dev);
+	if (IS_ERR_OR_NULL(pdata->fled_pinctrl)) {
 		pr_err("%s:%d Getting pinctrl handle failed\n",
 				__func__, __LINE__);
 		return -EINVAL;
-    }
+	}
 
-    pdata->gpio_state_active = pinctrl_lookup_state(pdata->fled_pinctrl, FLED_PINCTRL_STATE_DEFAULT);
-    if (IS_ERR_OR_NULL(pdata->gpio_state_active)) {
+	pdata->gpio_state_active = pinctrl_lookup_state(pdata->fled_pinctrl, FLED_PINCTRL_STATE_DEFAULT);
+	if (IS_ERR_OR_NULL(pdata->gpio_state_active)) {
 		pr_err("%s:%d Failed to get the active state pinctrl handle\n",
 				__func__, __LINE__);
 		return -EINVAL;
-    }
+	}
 
-    pdata->gpio_state_suspend = pinctrl_lookup_state(pdata->fled_pinctrl, FLED_PINCTRL_STATE_SLEEP);
-    if (IS_ERR_OR_NULL(pdata->gpio_state_suspend)) {
+	pdata->gpio_state_suspend = pinctrl_lookup_state(pdata->fled_pinctrl, FLED_PINCTRL_STATE_SLEEP);
+	if (IS_ERR_OR_NULL(pdata->gpio_state_suspend)) {
 		pr_err("%s:%d Failed to get the active state pinctrl handle\n",
 				__func__, __LINE__);
 		return -EINVAL;
-    }
+	}
 
-    ret = pinctrl_select_state(pdata->fled_pinctrl, pdata->gpio_state_suspend);
-    if (ret) {
+	ret = pinctrl_select_state(pdata->fled_pinctrl, pdata->gpio_state_suspend);
+	if (ret) {
 		pr_err("%s:%d cannot set pin to active state", __func__, __LINE__);
 		return ret;
-    }
-
-    pr_err("%s End : X\n", __func__);
+	}
+	pr_err("%s End : X\n", __func__);
 
 	return 0;
 err_register_irq:

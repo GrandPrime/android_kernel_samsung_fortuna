@@ -526,6 +526,7 @@ DEFINE_MUTEX(cpufreq_limit_mutex);
 static ssize_t cpufreq_table_show(struct kobject *kobj,
 			struct kobj_attribute *attr, char *buf)
 {
+#ifndef CONFIG_CPU_FREQ_LIMIT_HMP
 	ssize_t len = 0;
 	int i, count = 0;
 	unsigned int freq;
@@ -552,6 +553,9 @@ static ssize_t cpufreq_table_show(struct kobject *kobj,
 	len += sprintf(buf + len, "\n");
 
 	return len;
+#else
+	return cpufreq_limit_get_table(buf);
+#endif
 }
 
 static ssize_t cpufreq_table_store(struct kobject *kobj,
@@ -651,6 +655,7 @@ power_attr(cpufreq_max_limit);
 power_attr(cpufreq_min_limit);
 
 struct cpufreq_limit_handle *cpufreq_min_touch;
+struct cpufreq_limit_handle *cpufreq_min_finger;
 
 
 int set_freq_limit(unsigned long id, unsigned int freq)
@@ -664,6 +669,11 @@ int set_freq_limit(unsigned long id, unsigned int freq)
 		cpufreq_min_touch = NULL;
 	}
 
+	if (cpufreq_min_finger) {
+		cpufreq_limit_put(cpufreq_min_finger);
+		cpufreq_min_finger = NULL;
+	}
+
 	pr_debug("%s: id=%d freq=%d\n", __func__, (int)id, freq);
 
 	/* min lock */
@@ -671,6 +681,16 @@ int set_freq_limit(unsigned long id, unsigned int freq)
 		if (freq != -1) {
 			cpufreq_min_touch = cpufreq_limit_min_freq(freq, "touch min");
 			if (IS_ERR(cpufreq_min_touch)) {
+				pr_err("%s: fail to get the handle\n", __func__);
+				goto out;
+			}
+		}
+	}
+	
+	if (id & DVFS_FINGER_ID) {
+		if (freq != -1) {
+			cpufreq_min_finger = cpufreq_limit_min_freq(freq, "finger min");
+			if (IS_ERR(cpufreq_min_finger)) {
 				pr_err("%s: fail to get the handle\n", __func__);
 				goto out;
 			}

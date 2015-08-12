@@ -348,7 +348,12 @@ static void set_dvfs_lock(struct ist30xx_data *info, int32_t on)
                         cancel_delayed_work(&info->work_dvfs_chg);
 
                         if (info->dvfs_freq != MIN_TOUCH_LIMIT) {
+#ifdef SECOND_MINLOCK_FOR_LEVEL1
+                                if (info->dvfs_boost_mode == DVFS_STAGE_SINGLE ||
+					info->dvfs_boost_mode == DVFS_STAGE_TRIPLE)
+#else
                                 if (info->dvfs_boost_mode == DVFS_STAGE_TRIPLE)
+#endif
                                         ret = set_freq_limit(DVFS_TOUCH_ID,
                                                 MIN_TOUCH_LIMIT_SECOND);
                                 else
@@ -1820,8 +1825,6 @@ static struct i2c_driver ist30xx_i2c_driver = {
 extern int poweroff_charging;
 #endif
 
-extern int get_lcd_attached(void);
-
 static int __init ist30xx_init(void)
 {
 #ifdef CONFIG_SAMSUNG_LPM_MODE
@@ -1830,10 +1833,6 @@ static int __init ist30xx_init(void)
 		return 0;
 	}
 #endif
-        if (get_lcd_attached() == 0) {
-                tsp_info("%s() LCD is not attached!!\n", __func__);
-                return 0;
-        }
 
 	return i2c_add_driver(&ist30xx_i2c_driver);
 }

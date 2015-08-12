@@ -44,35 +44,4 @@ config FB_MSM_MDSS_MDP3
 	The MDP3 provides support for an older version display controller
 	included in latest display sub-system, known as MDSS.
 
-config FB_MSM_MIPI_HIMAX_WVGA_VIDEO_PANEL
-	depends on FB_MSM_MDSS
-	bool "Support BOE WVGA VIDEO (hx8369b) Panel"
-	default n
-
-config FB_MSM_MIPI_HX8389C_QHD_VIDEO_PANEL
-	depends on FB_MSM_MDSS
-	bool "Support qHD VIDEO (HX8389C) Panel"
-	default n
-
-config FB_MSM_MIPI_S6D2AA0X_HD_VIDEO_PANEL
-	depends on FB_MSM_MDSS
-	bool "Support Sharp Panel"
-	default n
-
-config BL_ISL98611
-	bool "Support Backlight ISL98611"
-	default n
-
-config MDNIE_TFT_MSM8X16
-	bool "MDNIe tft panel tuning"
-	default n
-
-config MDNIE_TFT_HIMAX
-	bool "MDNIe Himax tft panel tuning"
-	default n
-
-
-config CABC_TUNING
-	bool "CABC panel tuning"
-	default n
-
+source "drivers/video/msm/mdss/samsung/Kconfig"

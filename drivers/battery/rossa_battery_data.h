@@ -3,7 +3,8 @@
 #define CAPACITY_MIN			-7
 
 
-#if defined(CONFIG_MACH_ROSSA_SPR) || defined(CONFIG_MACH_ROSSA_VZW) || defined(CONFIG_MACH_ROSSA_TFN) || defined(CONFIG_MACH_ROSSA_AIO)
+#if defined(CONFIG_MACH_ROSSA_SPR) || defined(CONFIG_MACH_ROSSA_VZW) || defined(CONFIG_MACH_ROSSA_TFN) \
+|| defined(CONFIG_MACH_ROSSA_AIO)
 static sec_bat_adc_table_data_t temp_table[] = {
 	{25070, 900},
 	{25570, 850},
@@ -70,7 +71,7 @@ static sec_bat_adc_table_data_t temp_table[] = {
 };
 #endif
 
-#if defined(CONFIG_MACH_ROSSA_SPR)
+#if defined(CONFIG_MACH_ROSSA_SPR) || defined(CONFIG_MACH_ROSSA_AIO) || defined(CONFIG_MACH_ROSSA_TMO)
 #define TEMP_HIGH_THRESHOLD_EVENT  635
 #define TEMP_HIGH_RECOVERY_EVENT   480
 #define TEMP_LOW_THRESHOLD_EVENT   (-70)
@@ -83,25 +84,12 @@ static sec_bat_adc_table_data_t temp_table[] = {
 #define TEMP_HIGH_RECOVERY_LPM     482
 #define TEMP_LOW_THRESHOLD_LPM     (-30)
 #define TEMP_LOW_RECOVERY_LPM      -8
-#elif defined(CONFIG_MACH_ROSSA_AIO)
-#define TEMP_HIGH_THRESHOLD_EVENT  635
-#define TEMP_HIGH_RECOVERY_EVENT   480
-#define TEMP_LOW_THRESHOLD_EVENT   (-70)
-#define TEMP_LOW_RECOVERY_EVENT    0
-#define TEMP_HIGH_THRESHOLD_NORMAL 530
-#define TEMP_HIGH_RECOVERY_NORMAL  470
-#define TEMP_LOW_THRESHOLD_NORMAL  (-50)
-#define TEMP_LOW_RECOVERY_NORMAL   5
-#define TEMP_HIGH_THRESHOLD_LPM    510
-#define TEMP_HIGH_RECOVERY_LPM     482
-#define TEMP_LOW_THRESHOLD_LPM     (-30)
-#define TEMP_LOW_RECOVERY_LPM      -8
 #elif defined(CONFIG_MACH_ROSSA_VZW) || defined(CONFIG_MACH_ROSSA_TFN)
-#define TEMP_HIGH_THRESHOLD_EVENT  615
+#define TEMP_HIGH_THRESHOLD_EVENT  620
 #define TEMP_HIGH_RECOVERY_EVENT   480
 #define TEMP_LOW_THRESHOLD_EVENT   (-70)
 #define TEMP_LOW_RECOVERY_EVENT    0
-#define TEMP_HIGH_THRESHOLD_NORMAL 513
+#define TEMP_HIGH_THRESHOLD_NORMAL 520
 #define TEMP_HIGH_RECOVERY_NORMAL  470
 #define TEMP_LOW_THRESHOLD_NORMAL  (-50)
 #define TEMP_LOW_RECOVERY_NORMAL   5

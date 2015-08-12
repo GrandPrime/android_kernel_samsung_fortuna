@@ -764,7 +764,7 @@ repeat:
 			JBUFFER_TRACE(jh, "on shadow: sleep");
 			jbd_unlock_bh_state(bh);
 			wait_on_bit(&bh->b_state, BH_Shadow,
-				    sleep_on_shadow_bh, TASK_UNINTERRUPTIBLE);
+					sleep_on_shadow_bh, TASK_UNINTERRUPTIBLE);
 			goto repeat;
 		}
 
@@ -782,6 +782,7 @@ repeat:
 		 * transaction, so we HAVE to force the frozen_data copy
 		 * in that case.
 		 */
+
 		if (jh->b_jlist == BJ_Metadata || force_copy) {
 			JBUFFER_TRACE(jh, "generate frozen data");
 			if (!frozen_buffer) {
@@ -1436,9 +1437,12 @@ int jbd2_journal_stop(handle_t *handle)
 	 * to perform a synchronous write.  We do this to detect the
 	 * case where a single process is doing a stream of sync
 	 * writes.  No point in waiting for joiners in that case.
+	 *
+	 * Setting max_batch_time to 0 disables this completely.
 	 */
 	pid = current->pid;
-	if (handle->h_sync && journal->j_last_sync_writer != pid) {
+	if (handle->h_sync && journal->j_last_sync_writer != pid &&
+	    journal->j_max_batch_time) {
 		u64 commit_time, trans_time;
 
 		journal->j_last_sync_writer = pid;

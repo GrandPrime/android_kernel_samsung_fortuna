@@ -13,12 +13,13 @@
 #include <linux/syslog.h>
 #include <linux/bootmem.h>
 #include <linux/export.h>
+#include <linux/slab.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
 #ifdef CONFIG_SEC_DEBUG
-#include <mach/sec_debug.h>
+#include <linux/sec_debug.h>
 #endif
 
 #define LOG_MAGIC 0x4d474f4c	/* "LOGM" */
@@ -33,7 +34,7 @@ int __init sec_avc_log_init(void)
 	unsigned *sec_avc_log_mag;
 
 	sec_avc_log_size = size + 8;
-	sec_avc_log_mag = alloc_bootmem(sec_avc_log_size);
+	sec_avc_log_mag = kzalloc(sec_avc_log_size, GFP_NOWAIT);
 	pr_info("allocating %u bytes at %p (%lx physical) for avc log\n",
 		sec_avc_log_size, sec_avc_log_mag, __pa(sec_avc_log_buf));
 
@@ -50,7 +51,7 @@ int __init sec_avc_log_init(void)
 	return 1;
 }
 
-#define BUF_SIZE 512
+#define BUF_SIZE 256
 void sec_avc_log(char *fmt, ...)
 {
 	va_list args;
@@ -71,10 +72,11 @@ void sec_avc_log(char *fmt, ...)
 	size = strlen(buf);
 
 	if (idx + size > sec_avc_log_size - 1) {
-		len = scnprintf(&sec_avc_log_buf[0], size + 1, "%s\n", buf);
+		len = scnprintf(&sec_avc_log_buf[0],
+				size + 1, "%s", buf);
 		*sec_avc_log_ptr = len;
 	} else {
-		len = scnprintf(&sec_avc_log_buf[idx], size + 1, "%s\n", buf);
+		len = scnprintf(&sec_avc_log_buf[idx], size + 1, "%s", buf);
 		*sec_avc_log_ptr += len;
 	}
 }

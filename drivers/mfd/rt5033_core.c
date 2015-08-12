@@ -335,6 +335,7 @@ static int rt5033_reset(struct i2c_client *i2c)
 	rt5033_clr_bits(i2c, 0x1a, 0x20);
 	return 0;
 }
+
 void rt5033_read_dump(struct i2c_client *i2c)
 {
 	u8 d1,d2,d3;
@@ -549,13 +550,12 @@ err_add_regulator_devs:
 #endif /*CONFIG_REGULATOR_RT5033*/
 err_init_irq:
 	wake_lock_destroy(&(chip->irq_wake_lock));
-	mutex_destroy(&chip->suspend_flag_lock);
 	mutex_destroy(&chip->regulator_lock);
 	mutex_destroy(&chip->io_lock);
-irq_base_err:
-err_i2cfunc_not_support:
 	kfree(chip);
+irq_base_err:
 err_mfd_nomem:
+err_i2cfunc_not_support:
 err_parse_dt:
 err_dt_nomem:
 	return ret;

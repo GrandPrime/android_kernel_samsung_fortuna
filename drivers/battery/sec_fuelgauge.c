@@ -391,11 +391,13 @@ static int fuelgauge_parse_dt(struct device *dev,
 				"fuelgaguge,repeated_fuelalert");
 
 		pdata->jig_irq = of_get_named_gpio(np, "fuelgauge,jig_gpio", 0);
-		if (pdata->jig_irq < 0)
+		if (pdata->jig_irq < 0) {
 			pr_err("%s error reading jig_gpio = %d\n",
 					__func__,pdata->jig_irq);
-		else
+			pdata->jig_irq = 0;
+		} else {
 			pdata->jig_irq_attr = IRQF_TRIGGER_RISING;
+		}
 
 		pr_info("%s: fg_irq: %d, "
 				"calculation_type: 0x%x, fuel_alert_soc: %d,"
@@ -497,8 +499,6 @@ static int sec_fuelgauge_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, fuelgauge);
 
 	if (fuelgauge->pdata->fg_gpio_init != NULL) {
-		dev_err(&client->dev,
-				"%s: @@@\n", __func__);
 		if (!fuelgauge->pdata->fg_gpio_init()) {
 			dev_err(&client->dev,
 					"%s: Failed to Initialize GPIO\n", __func__);
@@ -531,7 +531,7 @@ static int sec_fuelgauge_probe(struct i2c_client *client,
 	if (ret) {
 		dev_err(&client->dev,
 			"%s: Failed to Register psy_fg\n", __func__);
-		goto err_free;
+		goto err_devm_free;
 	}
 
 	fuelgauge->is_fuel_alerted = false;
@@ -544,7 +544,7 @@ static int sec_fuelgauge_probe(struct i2c_client *client,
 			dev_err(&client->dev,
 				"%s: Failed to Initialize Fuel-alert\n",
 				__func__);
-			goto err_irq;
+			goto err_supply_unreg;
 		}
 	}
 
