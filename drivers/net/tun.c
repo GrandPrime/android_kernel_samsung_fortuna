@@ -1,6 +1,7 @@
 /*
  *  TUN - Universal TUN/TAP device driver.
  *  Copyright (C) 1999-2002 Maxim Krasnyansky <maxk@qualcomm.com>
+ *  Copyright (c) 2015 Samsung Electronics Co., Ltd.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -32,6 +33,14 @@
  *
  *  Daniel Podlejski <underley@underley.eu.org>
  *    Modifications for 2.3.99-pre5 kernel.
+ */
+/*
+ *  Changes:
+ *  KwnagHyun Kim <kh0304.kim@samsung.com> 2015/07/08
+ *  Baesung Park  <baesung.park@samsung.com> 2015/07/08
+ *  Vignesh Saravanaperumal <vignesh1.s@samsung.com> 2015/07/08
+ *    Add codes to share UID/PID information
+ *
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -68,6 +77,7 @@
 #include <net/netns/generic.h>
 #include <net/rtnetlink.h>
 #include <net/sock.h>
+
 // ------------- START of KNOX_VPN ------------------//
 #include <linux/types.h>
 #include <linux/udp.h>
@@ -110,8 +120,6 @@ do {								\
 } while (0)
 #endif
 
-#define GOODCOPY_LEN 128
-
 // ------------- START of KNOX_VPN ------------------//
 /* The KNOX framework marks packets intended to a VPN client for special processing differently.
  * The marked packets hit special IP table rules and are routed back to user space using the TUN driver
@@ -126,13 +134,15 @@ do {								\
 /* Metadata header structure */
 
 struct knox_meta_param {
-    uid_t uid;
-    pid_t pid;
+	uid_t uid;
+	pid_t pid;
 };
 
 #define TUN_META_HDR_SZ sizeof(struct knox_meta_param)
 #define TUN_META_MARK_OFFSET offsetof(struct knox_meta_param, uid)
 // ------------- END of KNOX_VPN -------------------//
+
+#define GOODCOPY_LEN 128
 
 #define FLT_EXACT_COUNT 8
 struct tap_filter {
@@ -1297,11 +1307,10 @@ static ssize_t tun_chr_aio_write(struct kiocb *iocb, const struct iovec *iv,
 }
 
 // ------------- START of KNOX_VPN ------------------//
-
 /* KNOX VPN packets have extra bytes because they carry meta information by default
-     * Such packets have sizeof(struct tun_meta_header) extra bytes in the IP options
-     * This automatically reflects in the IP header length (IHL)
-     */
+ * Such packets have sizeof(struct tun_meta_header) extra bytes in the IP options
+ * This automatically reflects in the IP header length (IHL)
+ */
 static int knoxvpn_process_uidpid(struct tun_struct *tun, struct sk_buff *skb,
 			      const struct iovec *iv, int *len, ssize_t * total)
 {
@@ -1354,7 +1363,6 @@ static int knoxvpn_process_uidpid(struct tun_struct *tun, struct sk_buff *skb,
 	return 0;
 
 }
-
 // ------------- END of KNOX_VPN ------------------//
 
 /* Put packet to the user space buffer */

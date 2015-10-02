@@ -95,6 +95,30 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 			}
 			break;
 
+#if defined(CONFIG_SEC_NOVEL_PROJECT) && defined(CONFIG_CAM_USE_GPIO_I2C)
+		case CAM_VIO_VT:
+			for (j = 0; j < num_vreg; j++) {
+				if (!strcmp(cam_vreg[j].reg_name, "cam_vio_vt")) {
+					CDBG("%s:%d i %d j %d cam_vio_vt\n",
+						__func__, __LINE__, i, j);
+					power_setting[i].seq_val = j;
+					break;
+				}
+			}
+			break;
+#endif
+
+		case CAM_VANA_VT:
+			for (j = 0; j < num_vreg; j++) {
+				if (!strcmp(cam_vreg[j].reg_name, "cam_vana_vt")) {
+					CDBG("%s:%d i %d j %d cam_vana_vt\n",
+						__func__, __LINE__, i, j);
+					power_setting[i].seq_val = j;
+					break;
+				}
+			}
+			break;
+
 		default:
 			pr_err("%s:%d invalid seq_val %d\n", __func__,
 				__LINE__, power_setting[i].seq_val);
@@ -445,6 +469,12 @@ int msm_camera_get_dt_power_setting_data(struct device_node *of_node,
 				ps[i].seq_val = SENSOR_GPIO_VDIG;
 			else if (!strcmp(seq_name, "sensor_gpio_vana"))
 				ps[i].seq_val = SENSOR_GPIO_VANA;
+			else if (!strcmp(seq_name, "sensor_gpio_vt_reset"))
+				ps[i].seq_val = SENSOR_GPIO_VT_RESET;
+#if defined(CONFIG_SEC_NOVEL_PROJECT) && defined(CONFIG_CAM_USE_GPIO_I2C)
+			else if (!strcmp(seq_name, "sensor_gpio_vt_standby"))
+				ps[i].seq_val = SENSOR_GPIO_VT_STANDBY;
+#endif
 			else
 				rc = -EILSEQ;
 			break;
@@ -543,7 +573,7 @@ int msm_camera_get_dt_power_setting_data(struct device_node *of_node,
 				power_down_setting_t;
 			end--;
 		}
-#if defined(CONFIG_MACH_ROSSA_TMO)
+#if defined(CONFIG_SR544) || defined(CONFIG_SR200PC20)
 		for (c = 0; c < size; c ++) {
 			if(power_info->power_down_setting[c].seq_val == SENSOR_GPIO_VDIG)
 			{
@@ -808,27 +838,6 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 	} else
 		rc = 0;
 
-#if defined(CONFIG_MACH_ROSSA_TMO) || defined(CONFIG_SEC_A8_PROJECT)
-	rc = of_property_read_u32(of_node, "qcom,gpio-vt-reset", &val);
-	if (rc != -EINVAL) {
-		if (rc < 0) {
-			pr_err("%s:%d read qcom,gpio-vt-reset failed rc %d\n",
-				__func__, __LINE__, rc);
-			goto ERROR;
-		} else if (val >= gpio_array_size) {
-			pr_err("%s:%d qcom,gpio-vt-reset invalid %d\n",
-				__func__, __LINE__, val);
-			rc = -EINVAL;
-			goto ERROR;
-		}
-		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VT_RESET] =
-			gpio_array[val];
-		gconf->gpio_num_info->valid[SENSOR_GPIO_VT_RESET] = 1;
-		CDBG("%s qcom,gpio-vt-reset %d\n", __func__,
-			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VT_RESET]);
-	} else
-		rc = 0;
-#endif
 	rc = of_property_read_u32(of_node, "qcom,gpio-reset", &val);
 	if (rc != -EINVAL) {
 		if (rc < 0) {
@@ -868,6 +877,48 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_STANDBY]);
 	} else
 		rc = 0;
+
+	rc = of_property_read_u32(of_node, "qcom,gpio-vt-reset", &val);
+	if (rc != -EINVAL) {
+		if (rc < 0) {
+			pr_err("%s:%d read qcom,gpio-vt-reset failed rc %d\n",
+				__func__, __LINE__, rc);
+			goto ERROR;
+		} else if (val >= gpio_array_size) {
+			pr_err("%s:%d qcom,gpio-vt-reset invalid %d\n",
+				__func__, __LINE__, val);
+			rc = -EINVAL;
+			goto ERROR;
+		}
+		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VT_RESET] =
+			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_VT_RESET] = 1;
+		CDBG("%s qcom,gpio-vt-reset %d\n", __func__,
+			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VT_RESET]);
+	} else
+		rc = 0;
+
+#if defined(CONFIG_SEC_NOVEL_PROJECT) && defined(CONFIG_CAM_USE_GPIO_I2C)
+	rc = of_property_read_u32(of_node, "qcom,gpio-vt-standby", &val);
+	if (rc != -EINVAL) {
+		if (rc < 0) {
+			pr_err("%s:%d read qcom,gpio-vt-standby failed rc %d\n",
+				__func__, __LINE__, rc);
+			goto ERROR;
+		} else if (val >= gpio_array_size) {
+			pr_err("%s:%d qcom,gpio-vt-standby invalid %d\n",
+				__func__, __LINE__, val);
+			rc = -EINVAL;
+			goto ERROR;
+		}
+		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VT_STANDBY] =
+			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_VT_STANDBY] = 1;
+		CDBG("%s qcom,gpio-vt-standby %d\n", __func__,
+			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VT_STANDBY]);
+	} else
+		rc = 0;
+#endif
 
 	rc = of_property_read_u32(of_node, "qcom,gpio-af-pwdm", &val);
 	if (rc != -EINVAL) {

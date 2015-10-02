@@ -38,20 +38,9 @@
 #include <media/radio-iris.h>
 #include <asm/unaligned.h>
 
-#ifdef CONFIG_RADIO_LNA_CONTROL
+#ifdef CONFIG_TDMB_FM_ANT_SEL
 #include <linux/of_gpio.h>
-#ifdef CONFIG_RADIO_LNA_CONTROL_WITH_EX_POWER
 #include <linux/regulator/consumer.h>
-#endif
-#endif
-
-#ifdef CONFIG_RADIO_LNA_CONTROL
-#ifdef CONFIG_RADIO_LNA_CONTROL_WITH_EX_POWER
-enum {
-	OFF = 0,
-	ON,
-};
-#endif
 #endif
 
 static unsigned int rds_buf = 100;
@@ -90,9 +79,9 @@ struct iris_device {
 	int tune_req;
 	unsigned int mode;
 
-#ifdef CONFIG_RADIO_LNA_CONTROL
-	int lna_gpio;
-	struct pinctrl *lna_pinctrl;
+#ifdef CONFIG_TDMB_FM_ANT_SEL
+	int tdmb_fm_ant_sel;
+	struct regulator *reg_io;
 #endif
 
 	__u16 pi;
@@ -3870,38 +3859,6 @@ END:
 	return retval;
 }
 
-#ifdef CONFIG_RADIO_LNA_CONTROL
-#ifdef CONFIG_RADIO_LNA_CONTROL_WITH_EX_POWER
-static int Radio_regulator_onoff(struct device *dev, bool onoff)
-{
-	struct regulator *vdd;
-	int ret;
-
-	pr_info("%s %s\n", __func__, (onoff) ? "on" : "off");
-
-	vdd = devm_regulator_get(dev, "iris_fm,vdd");
-	if (IS_ERR(vdd)) {
-		pr_err("%s, cannot get vdd\n", __func__);
-		return -ENOMEM;
-	} else if (!regulator_get_voltage(vdd)) {
-		regulator_set_voltage(vdd, 2700000, 2700000);
-	}
-
-	if (onoff) {
-		ret = regulator_enable(vdd);
-		msleep(20);
-	} else {
-		ret = regulator_disable(vdd);
-		msleep(20);
-	}
-	devm_regulator_put(vdd);
-	msleep(20);
-
-	return 0;
-}
-#endif
-#endif
-
 static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 		struct v4l2_control *ctrl)
 {
@@ -3918,6 +3875,9 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 	char sinr_th, sinr;
 	__u8 intf_det_low_th, intf_det_high_th, intf_det_out;
 	unsigned int spur_freq;
+#ifdef CONFIG_TDMB_FM_ANT_SEL
+	int ret;
+#endif
 
 	if (unlikely(radio == NULL)) {
 		FMDERR(":radio is null");
@@ -3996,9 +3956,15 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 				retval = -EINVAL;
 				goto END;
 			}
-#ifdef CONFIG_RADIO_LNA_CONTROL
-			gpio_direction_output(radio->lna_gpio, 1);
-			pr_info("=%s== enable lna RF chip ==\n",__func__);
+#ifdef CONFIG_TDMB_FM_ANT_SEL
+			retval = regulator_enable(radio->reg_io);
+			if (retval)
+				pr_info("=%s== FM_RECV : regulator enable fail!! ==\n",__func__);
+			else
+				pr_info("=%s== FM_RECV : regulator enabled ==\n",__func__);
+			gpio_direction_output(radio->tdmb_fm_ant_sel, 0);
+			ret = gpio_get_value(radio->tdmb_fm_ant_sel);
+			pr_info("=%s== FM_RECV : tdmb_fm_ant_sel = %d\n",__func__, ret);
 #endif
 			radio->mode = FM_RECV_TURNING_ON;
 			retval = hci_cmd(HCI_FM_ENABLE_RECV_CMD,
@@ -4009,12 +3975,6 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 				radio->mode = FM_OFF;
 				goto END;
 			} else {
-#ifdef CONFIG_RADIO_LNA_CONTROL
-#ifdef CONFIG_RADIO_LNA_CONTROL_WITH_EX_POWER
-				Radio_regulator_onoff(radio->dev, ON);
-				pr_info("=%s== Radio_regulator_on ==\n",__func__);
-#endif
-#endif
 				retval = initialise_recv(radio);
 				if (retval < 0) {
 					FMDERR("Error while initialising");
@@ -4035,9 +3995,15 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 				retval = -EINVAL;
 				goto END;
 			}
-#ifdef CONFIG_RADIO_LNA_CONTROL
-			gpio_direction_output(radio->lna_gpio, 1);
-			pr_info("=%s== enable lna RF chip ==\n",__func__);
+#ifdef CONFIG_TDMB_FM_ANT_SEL
+			retval = regulator_enable(radio->reg_io);
+			if (retval)
+				pr_info("=%s== FM_TRANS : regulator enable fail!! ==\n",__func__);
+			else
+				pr_info("=%s== FM_TRANS : regulator enabled ==\n",__func__);
+			gpio_direction_output(radio->tdmb_fm_ant_sel, 0);
+			ret = gpio_get_value(radio->tdmb_fm_ant_sel);
+			pr_info("=%s== FM_TRANS : tdmb_fm_ant_sel = %d\n",__func__, ret);
 #endif
 			radio->mode = FM_TRANS_TURNING_ON;
 			retval = hci_cmd(HCI_FM_ENABLE_TRANS_CMD,
@@ -4064,12 +4030,6 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 			}
 			break;
 		case FM_OFF:
-#ifdef CONFIG_RADIO_LNA_CONTROL
-#ifdef CONFIG_RADIO_LNA_CONTROL_WITH_EX_POWER
-			Radio_regulator_onoff(radio->dev, OFF);
-			pr_info("=%s== Radio_regulator_off ==\n",__func__);
-#endif
-#endif
 			radio->spur_table_size = 0;
 			switch (radio->mode) {
 			case FM_RECV:
@@ -4082,9 +4042,15 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 					radio->mode = FM_RECV;
 					goto END;
 				}
-#ifdef CONFIG_RADIO_LNA_CONTROL
-				gpio_direction_output(radio->lna_gpio, 0);
-				pr_info("=%s== disable lna RF chip ==\n",__func__);
+#ifdef CONFIG_TDMB_FM_ANT_SEL
+			retval = regulator_disable(radio->reg_io);
+			if (retval)
+				pr_info("=%s== FM_RECV_OFF : regulator disable fail!! ==\n",__func__);
+			else
+				pr_info("=%s== FM_RECV_OFF : regulator disabled ==\n",__func__);
+			gpio_free(radio->tdmb_fm_ant_sel);
+			ret = gpio_get_value(radio->tdmb_fm_ant_sel);
+			pr_info("=%s==FM_RECV_OFF : gpio_free_tdmb_fm_ant_sel == %d\n",__func__,ret);
 #endif
 				break;
 			case FM_TRANS:
@@ -4098,9 +4064,15 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 					radio->mode = FM_TRANS;
 					goto END;
 				}
-#ifdef CONFIG_RADIO_LNA_CONTROL
-				gpio_direction_output(radio->lna_gpio, 0);
-				pr_info("=%s== disable lna RF chip ==\n",__func__);
+#ifdef CONFIG_TDMB_FM_ANT_SEL
+			retval = regulator_disable(radio->reg_io);
+			if (retval)
+				pr_info("=%s== FM_TRANS_OFF : regulator disable fail!! ==\n",__func__);
+			else
+				pr_info("=%s== FM_TRANS_OFF : regulator disabled ==\n",__func__);
+			gpio_free(radio->tdmb_fm_ant_sel);
+			ret = gpio_get_value(radio->tdmb_fm_ant_sel);
+			pr_info("=%s==FM_TRANS_OFF : gpio_free_tdmb_fm_ant_sel ==%d\n",__func__,ret);
 #endif
 				break;
 			default:
@@ -4802,7 +4774,7 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 
 		retval = hci_def_data_read(&rd, radio->fm_hdev);
 		if (retval < 0) {
-			FMDERR("Get AF Jump RMSSI Threshold failed %x", retval);
+			FMDERR("default data read failed %x", retval);
 			goto END;
 		}
 		wrd.mode = FM_RDS_CNFG_MODE;
@@ -4823,7 +4795,7 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 
 		retval = hci_def_data_read(&rd, radio->fm_hdev);
 		if (retval < 0) {
-			FMDERR("Get AF Jump RMSSI SAMPLES failed %x", retval);
+			FMDERR("default data read failed %x", retval);
 			goto END;
 		}
 		wrd.mode = FM_RDS_CNFG_MODE;
@@ -4843,7 +4815,7 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 
 		retval = hci_def_data_read(&rd, radio->fm_hdev);
 		if (retval < 0) {
-			FMDERR("Get AF Jump RMSSI SAMPLES failed %x", retval);
+			FMDERR("default data read failed %x", retval);
 			goto END;
 		}
 		wrd.mode = FM_RX_CONFG_MODE;
@@ -5473,35 +5445,6 @@ static int is_enable_tx_possible(struct iris_device *radio)
 	return retval;
 }
 
-#ifdef CONFIG_RADIO_LNA_CONTROL
-static int fm_lna_pinctrl_configure(struct iris_device *radio, bool active)
-{
-	struct pinctrl_state *set_state;
-	int retval;
-
-	pr_info("%s - active = %d\n", __func__, active);
-	if (active) {
-		set_state = pinctrl_lookup_state(radio->lna_pinctrl, "lna_gpio_active");
-		if (IS_ERR(set_state)) {
-			pr_err("%s: cannot get fm lna pinctrl active state\n", __func__);
-			return PTR_ERR(set_state);
-		}
-	} else {
-		set_state = pinctrl_lookup_state(radio->lna_pinctrl, "lna_gpio_suspend");
-		if (IS_ERR(set_state)) {
-			pr_err("%s: cannot get earjack pinctrl sleep state\n", __func__);
-			return PTR_ERR(set_state);
-		}
-	}
-	retval = pinctrl_select_state(radio->lna_pinctrl, set_state);
-	if (retval) {
-		pr_err("%s: cannot set fm lna pinctrl active state\n", __func__);
-		return retval;
-	}
-	return 0;
-}
-#endif
-
 static const struct v4l2_ioctl_ops iris_ioctl_ops = {
 	.vidioc_querycap              = iris_vidioc_querycap,
 	.vidioc_queryctrl             = iris_vidioc_queryctrl,
@@ -5545,7 +5488,10 @@ static int __init iris_probe(struct platform_device *pdev)
 	int retval;
 	int radio_nr = -1;
 	int i;
-#ifdef CONFIG_RADIO_LNA_CONTROL
+#ifdef CONFIG_TDMB_FM_ANT_SEL
+	struct device_node *node = pdev->dev.of_node;
+	struct device_node *reg_node = NULL;
+	struct device *dev = &pdev->dev;
 	int ret;
 #endif
 
@@ -5633,41 +5579,31 @@ static int __init iris_probe(struct platform_device *pdev)
 			kfree(radio);
 		}
 	}
-
-#ifdef CONFIG_RADIO_LNA_CONTROL
-	radio->lna_gpio = of_get_named_gpio(radio->dev->of_node, "qcom,fm-radio-lna-gpio", 0);
-	if (radio->lna_gpio < 0) {
-		pr_err("%s : can not find the fm-radio-lna-gpio in the dt\n", __func__);
+#ifdef CONFIG_TDMB_FM_ANT_SEL
+	reg_node = of_parse_phandle(node, "vdd-io-supply", 0);
+	if (reg_node) {
+			radio->reg_io = devm_regulator_get(dev, "vdd-io");
+			if (IS_ERR(radio->reg_io))
+				return PTR_ERR(radio->reg_io);
+	}
+	radio->tdmb_fm_ant_sel = of_get_named_gpio(radio->dev->of_node, "tdmb_fm_ant_sel", 0);
+	if (radio->tdmb_fm_ant_sel < 0) {
+		pr_err("%s : can not find the tdmb_fm_ant_sel in the dt\n", __func__);
 	} else
-		pr_info("%s : fm-radio-lna-gpio =%d\n", __func__, radio->lna_gpio);
+		pr_info("%s : tdmb_fm_ant_sel =%d\n", __func__, radio->tdmb_fm_ant_sel);
 
-	if(radio->lna_gpio > 0) {
-		ret = gpio_request(radio->lna_gpio, "lna_control");
+	if(radio->tdmb_fm_ant_sel > 0) {
+		ret = gpio_request(radio->tdmb_fm_ant_sel, "tdmb_fm_ant_sel");
 		if (ret) {
 			pr_err("%s : gpio_request failed for %d\n",
-				__func__, radio->lna_gpio);
-			gpio_free(radio->lna_gpio);
+				__func__, radio->tdmb_fm_ant_sel);
+			gpio_free(radio->tdmb_fm_ant_sel);
 		}
-	}
-
-	radio->lna_pinctrl = devm_pinctrl_get(&pdev->dev);
-	if (IS_ERR(radio->lna_pinctrl)) {
-		pr_err("%s: Target does not use pinctrl\n", __func__);
-		radio->lna_pinctrl = NULL;
-	}
-
-	if (radio->lna_pinctrl) {
-		ret = fm_lna_pinctrl_configure(radio, true);
-		if (ret)
-			pr_err("%s: cannot set lna pinctrl active state\n", __func__);
-		else
-			pr_info("%s : set lna pinctrl active state\n", __func__);
 	}
 #endif
 
 	return 0;
 }
-
 
 static int iris_remove(struct platform_device *pdev)
 {
@@ -5683,8 +5619,8 @@ static int iris_remove(struct platform_device *pdev)
 	for (i = 0; i < IRIS_BUF_MAX; i++)
 		kfifo_free(&radio->data_buf[i]);
 
-#ifdef CONFIG_RADIO_LNA_CONTROL
-	gpio_free(radio->lna_gpio);
+#ifdef CONFIG_TDMB_FM_ANT_SEL
+	gpio_free(radio->tdmb_fm_ant_sel);
 #endif
 	kfree(radio);
 
@@ -5692,34 +5628,6 @@ static int iris_remove(struct platform_device *pdev)
 
 	return 0;
 }
-
-#ifdef CONFIG_RADIO_LNA_CONTROL
-#ifdef CONFIG_PM
-static int radio_suspend(struct device *dev)
-{
-	struct iris_device *radio = video_get_drvdata(video_get_dev());
-	if (radio->lna_pinctrl) {
-		int ret = fm_lna_pinctrl_configure(radio, false);
-		if (ret)
-			dev_err(dev, "failed to put the pin in suspend state\n");
-	}
-	return 0;
-}
-
-static int radio_resume(struct device *dev)
-{
-	struct iris_device *radio = video_get_drvdata(video_get_dev());
-	if (radio->lna_pinctrl) {
-		int ret = fm_lna_pinctrl_configure(radio, true);
-		if (ret)
-			dev_err(dev, "failed to put the pin in resume state\n");
-	}
-	return 0;
-}
-
-static SIMPLE_DEV_PM_OPS(radio_pm_ops, radio_suspend, radio_resume);
-#endif
-#endif
 
 static const struct of_device_id iris_fm_match[] = {
 	{.compatible = "qcom,iris_fm"},
@@ -5731,11 +5639,6 @@ static struct platform_driver iris_driver = {
 		.owner  = THIS_MODULE,
 		.name   = "iris_fm",
 		.of_match_table = iris_fm_match,
-#ifdef CONFIG_RADIO_LNA_CONTROL		
-#ifdef CONFIG_PM
-		.pm	= &radio_pm_ops,
-#endif
-#endif
 	},
 	.remove = iris_remove,
 };

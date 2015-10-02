@@ -57,8 +57,13 @@
 #include "u_data_hsic.c"
 #include "u_ctrl_hsuart.c"
 #include "u_data_hsuart.c"
+
+#ifdef CONFIG_USB_DUN_SUPPORT
+#include "serial_acm.c"
+#endif
+
 #include "f_ccid.c"
-/* #include "f_acm.c" */
+#include "f_acm.c"
 /* #include "f_adb.c" */
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_MTP
 #include "f_mtp_samsung.c"
@@ -426,6 +431,8 @@ static void android_work(struct work_struct *data)
 	int pm_qos_vote = -1;
 
 	spin_lock_irqsave(&cdev->lock, flags);
+	pr_info("%s:: dev->sw_connected:%d, dev->connected:%d, dev->sw_suspended:%d, dev->suspended:%d, cdev->config:%p\n", __func__,
+			 dev->sw_connected,dev->connected,dev->sw_suspended,dev->suspended,cdev->config);
 	if (dev->suspended != dev->sw_suspended && cdev->config) {
 		if (strncmp(dev->pm_qos, "low", 3))
 			pm_qos_vote = dev->suspended ? 0 : 1;
@@ -2822,7 +2829,6 @@ static ssize_t sua_version_info_store(struct device *dev,
 		memcpy(config->common-> version_string,buf,len-1);
 	}
 	printk(KERN_DEBUG "usb: %s, %s\n", __func__, config->common-> version_string);
-
 	return size;
 }
 
@@ -3345,7 +3351,6 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 	strlcpy(buf, buff, sizeof(buf));
 	b = strim(buf);
 
-	dev->cdev->gadget->streaming_enabled = false;
 	while (b) {
 		conf_str = strsep(&b, ":");
 		if (!conf_str)
@@ -3385,6 +3390,10 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 					ffs_enabled = 1;
 				continue;
 			}
+
+			if (!strcmp(name, "rndis") &&
+				!strcmp(strim(rndis_transports), "BAM2BAM_IPA"))
+				name = "rndis_qc";
 
 			err = android_enable_function(dev, conf, name);
 			if (err)
@@ -3720,6 +3729,10 @@ static void android_unbind_config(struct usb_configuration *c)
 {
 	struct android_dev *dev = cdev_to_android_dev(c->cdev);
 
+	if (c->cdev->gadget->streaming_enabled) {
+		c->cdev->gadget->streaming_enabled = false;
+		pr_debug("setting streaming_enabled to false.\n");
+	}
 	android_unbind_enabled_functions(dev, c);
 }
 
@@ -4220,6 +4233,15 @@ static int android_probe(struct platform_device *pdev)
 		android_dev->idle_pc_rpm_no_int_secs = IDLE_PC_RPM_NO_INT_SECS;
 	}
 	strlcpy(android_dev->pm_qos, "high", sizeof(android_dev->pm_qos));
+
+#ifdef CONFIG_USB_DUN_SUPPORT
+	ret = modem_misc_register();
+	if (ret) {
+		printk(KERN_ERR "usb: %s modem misc register is failed\n",
+				__func__);
+		goto err_probe;
+	}
+#endif
 
 	printk("%s : return is %d! \n", __func__ , ret);
 	return ret;

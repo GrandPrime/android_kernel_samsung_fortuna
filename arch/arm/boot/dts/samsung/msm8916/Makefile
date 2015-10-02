@@ -28,185 +28,63 @@ dtb-$(CONFIG_ARCH_MSM8974) += msm8974-v1-cdp.dtb \
 	msm8974pro-ac-pm8941-liquid.dtb \
 	msm8974pro-ac-pm8941-mtp.dtb \
 	msm8974pro-ac-pma8084-pm8941-mtp.dtb
-dtb-$(CONFIG_ARCH_MSMFERRUM) += msmferrum-sim.dtb \
-	msmferrum-rumi.dtb \
-	msmferrum-qrd-skua.dtb \
-	msmferrum-cdp.dtb \
-	msmferrum-mtp.dtb \
-	msmferrum-1gb-qrd-skua.dtb \
-	msmferrum-1gb-cdp.dtb \
-	msmferrum-1gb-mtp.dtb
-ifeq ($(CONFIG_ARCH_MSM8916),y)
-ifeq ($(CONFIG_SEC_E7_PROJECT),y)
-	ifeq ($(CONFIG_MACH_E7_EUR_OPEN),y)
-		dtb-y += msm8916-sec-e7-eur-r00.dtb
-		dtb-y += msm8916-sec-e7-eur-r01.dtb
-		dtb-y += msm8916-sec-e7-eur-r02.dtb
-	else ifeq ($(CONFIG_MACH_E7_CHN_OPEN),y)
-		dtb-y += msm8916-sec-e7-chnopen-r00.dtb
-		dtb-y += msm8916-sec-e7-chnopen-r01.dtb
-	else ifeq ($(CONFIG_MACH_E7_CHN_CTC),y)
-		dtb-y += msm8916-sec-e7-ctc-r00.dtb
-		dtb-y += msm8916-sec-e7-ctc-r01.dtb
-	else ifeq ($(CONFIG_MACH_E73G_SEA_OPEN),y)
-		dtb-y += msm8916-sec-e73g-sea-r01.dtb
-		dtb-y += msm8916-sec-e73g-sea-r02.dtb
-	else ifeq ($(CONFIG_MACH_E73G_EUR_OPEN),y)
-		dtb-y += msm8916-sec-e73g-eur-r01.dtb
-		dtb-y += msm8916-sec-e73g-eur-r02.dtb
-		dtb-y += msm8916-sec-e73g-eur-r03.dtb
-		dtb-y += msm8916-sec-e73g-eur-r04.dtb
-		dtb-y += msm8916-sec-e73g-eur-r05.dtb
-		dtb-y += msm8916-sec-e73g-eur-r06.dtb
-	endif
-endif
-ifeq ($(CONFIG_SEC_GT58_PROJECT),y)
-	ifeq ($(CONFIG_MACH_GT58_EUR_OPEN),y)
-		dtb-y += msm8916-sec-gt58lte-eur-r00.dtb
-		dtb-y += msm8916-sec-gt58lte-eur-r01.dtb
-	else ifeq ($(CONFIG_MACH_GT58WIFI_EUR_OPEN),y)
-		dtb-y += msm8916-sec-gt58wifi-eur-r00.dtb
-		dtb-y += msm8916-sec-gt58wifi-eur-r01.dtb
-	else ifeq ($(CONFIG_MACH_GT5NOTE8_EUR_OPEN),y)
-		dtb-y += msm8916-sec-gt5note8lte-eur-r00.dtb
-		dtb-y += msm8916-sec-gt5note8lte-eur-r01.dtb
-		dtb-y += msm8916-sec-gt5note8lte-eur-r02.dtb
-	else ifeq ($(CONFIG_MACH_GT5NOTE8WIFI_EUR_OPEN),y)
-		dtb-y += msm8916-sec-gt5note8wifi-eur-r02.dtb
-	else ifeq ($(CONFIG_MACH_GT58_USA_VZW),y)
-		dtb-y += msm8916-sec-gt58lte-vzw-r01.dtb
-	else ifeq ($(CONFIG_MACH_GT58_USA_TMO),y)
-		dtb-y += msm8916-sec-gt58lte-tmo-r05.dtb
-		dtb-y += msm8916-sec-gt58lte-tmo-r06.dtb
-	else ifeq ($(CONFIG_MACH_GT58_SEA_XSA),y)
-		dtb-y += msm8916-sec-gt58lte-aus-r00.dtb
-	endif
-endif
+dtb-$(CONFIG_ARCH_MSM8909) += msm8909-sim.dtb \
+	msm8909-rumi.dtb \
+	msm8909-qrd-skua.dtb \
+	msm8909-qrd-skuc.dtb \
+	msm8909-qrd-skue.dtb \
+	msm8909-cdp.dtb \
+	msm8909-mtp.dtb \
+	msm8909-mtp-smb1360.dtb \
+	msm8909-1gb-qrd-skua.dtb \
+	msm8909-1gb-cdp.dtb \
+	msm8909-1gb-mtp.dtb
 
-ifeq ($(CONFIG_SEC_GT510_PROJECT),y)
-	ifeq ($(CONFIG_MACH_GT510_EUR_OPEN),y)
-		dtb-y += msm8916-sec-gt510lte-eur-r00.dtb
-		dtb-y += msm8916-sec-gt510lte-eur-r01.dtb
-		dtb-y += msm8916-sec-gt510lte-eur-r02.dtb
-		dtb-y += msm8916-sec-gt510lte-eur-r03.dtb
-		dtb-y += msm8916-sec-gt510lte-eur-r04.dtb
-		dtb-y += msm8916-sec-gt510lte-eur-r06.dtb
-		dtb-y += msm8916-sec-gt510lte-eur-r07.dtb
-	else ifeq ($(CONFIG_MACH_GT510WIFI_EUR_OPEN),y)
-		dtb-y += msm8916-sec-gt510wifi-eur-r00.dtb
-		dtb-y += msm8916-sec-gt510wifi-eur-r03.dtb
-		dtb-y += msm8916-sec-gt510wifi-eur-r06.dtb
-		dtb-y += msm8916-sec-gt510wifi-eur-r07.dtb
-	else ifeq ($(CONFIG_MACH_GT5NOTE10_EUR_OPEN),y)
-		dtb-y += msm8916-sec-gt5note10lte-eur-r00.dtb
-		dtb-y += msm8916-sec-gt5note10lte-eur-r01.dtb
-		dtb-y += msm8916-sec-gt5note10lte-eur-r02.dtb
-		dtb-y += msm8916-sec-gt5note10lte-eur-r03.dtb
-		dtb-y += msm8916-sec-gt5note10lte-eur-r04.dtb
-		dtb-y += msm8916-sec-gt5note10lte-eur-r05.dtb
-		dtb-y += msm8916-sec-gt5note10lte-eur-r06.dtb
-		dtb-y += msm8916-sec-gt5note10lte-eur-r07.dtb
-	else ifeq ($(CONFIG_MACH_GT5NOTE10WIFI_EUR_OPEN),y)
-		dtb-y += msm8916-sec-gt5note10wifi-eur-r03.dtb
-		dtb-y += msm8916-sec-gt5note10wifi-eur-r04.dtb
-		dtb-y += msm8916-sec-gt5note10wifi-eur-r05.dtb
-		dtb-y += msm8916-sec-gt5note10wifi-eur-r06.dtb
-		dtb-y += msm8916-sec-gt5note10wifi-eur-r07.dtb
-	else ifeq ($(CONFIG_MACH_GT510_USA_VZW),y)
-		dtb-y += msm8916-sec-gt510lte-vzw-r03.dtb
-	else ifeq ($(CONFIG_MACH_GT510_CHN_OPEN),y)
-		dtb-y += msm8916-sec-gt510lte-chnopen-r04.dtb
-		dtb-y += msm8916-sec-gt510lte-chnopen-r07.dtb
-	else ifeq ($(CONFIG_MACH_GT5NOTE10_CHN_OPEN),y)
-		dtb-y += msm8916-sec-gt5note10lte-chn-r04.dtb
-		dtb-y += msm8916-sec-gt5note10lte-chn-r05.dtb
-		dtb-y += msm8916-sec-gt5note10lte-chn-r07.dtb
-	else ifeq ($(CONFIG_MACH_GT5NOTE10_KOR_OPEN),y)
-		dtb-y += msm8916-sec-gt5note10lte-kor-r00.dtb
-		dtb-y += msm8916-sec-gt5note10lte-kor-r01.dtb
-		dtb-y += msm8916-sec-gt5note10lte-kor-r02.dtb
-		dtb-y += msm8916-sec-gt5note10lte-kor-r03.dtb
-		dtb-y += msm8916-sec-gt5note10lte-kor-r04.dtb
-		dtb-y += msm8916-sec-gt5note10lte-kor-r05.dtb
-		dtb-y += msm8916-sec-gt5note10lte-kor-r06.dtb
-		dtb-y += msm8916-sec-gt5note10lte-kor-r07.dtb
+ifeq ($(CONFIG_SEC_ROSSA_PROJECT),y)
+	ifeq ($(CONFIG_MACH_ROSSA_EUR_OPEN),y)
+		dtb-y += msm8916-sec-rossa-eur-r00.dtb
+		dtb-y += msm8916-sec-rossa-eur-r01.dtb
+	else ifeq ($(CONFIG_MACH_ROSSA_TMO),y)
+		dtb-y += msm8916-sec-rossa-tmo-r00.dtb
 	endif
-endif
-
-ifeq ($(CONFIG_SEC_SIGNUM_PROJECT),y)
-	dtb-y += msm8916-sec-signumlte-eur-r00.dtb
-endif
-
-ifeq ($(CONFIG_SEC_E5_PROJECT),y)
-	ifeq ($(CONFIG_MACH_E5_EUR_OPEN),y)
-		dtb-y += msm8916-sec-e5-r00.dtb
-		dtb-y += msm8916-sec-e5-r01.dtb
-		dtb-y += msm8916-sec-e5-r02.dtb
-		dtb-y += msm8916-sec-e5-r03.dtb
-		dtb-y += msm8916-sec-e5-r04.dtb
-	else ifeq ($(CONFIG_MACH_E5_USA_TFN),y)
-		dtb-y += msm8916-sec-e5-tfn-r00.dtb
-		dtb-y += msm8916-sec-e5-tfn-r01.dtb
-		dtb-y += msm8916-sec-e5-tfn-r02.dtb
-	else ifeq ($(CONFIG_MACH_E53G_EUR_OPEN),y)
-		dtb-y += msm8916-sec-e53g-r03.dtb
-		dtb-y += msm8916-sec-e53g-r04.dtb
-		dtb-y += msm8916-sec-e53g-r06.dtb
-		dtb-y += msm8916-sec-e53g-r07.dtb
-		dtb-y += msm8916-sec-e53g-r08.dtb
-		dtb-y += msm8916-sec-e53g-r09.dtb
-		dtb-y += msm8916-sec-e53g-r10.dtb
-	endif
-endif
-
-ifeq ($(CONFIG_SEC_A3_PROJECT),y)
-	ifeq ($(CONFIG_MACH_A3U_EUR_OPEN),y)
-		dtb-y += msm8916-sec-a3u-eur-r01.dtb
-	endif
-endif
-
-ifeq ($(CONFIG_SEC_MATISSEVE_PROJECT),y)
-	ifeq ($(CONFIG_MACH_MATISSEVEWIFI_EUR_OPEN),y)
-		dtb-y += msm8916-sec-matissevewifi-eur-r00.dtb
-		dtb-y += msm8916-sec-matissevewifi-eur-r02.dtb
-	endif
-endif
-
-ifeq ($(CONFIG_SEC_A5_PROJECT),y)
-	ifeq ($(CONFIG_MACH_A5U_EUR_OPEN),y)
-		dtb-y += msm8916-sec-a5u-eur-r01.dtb
-	endif
-endif
-ifeq ($(CONFIG_SEC_GTEL_PROJECT),y)
-	ifeq ($(CONFIG_MACH_GTEL_USA_VZW),y)
-		dtb-y += msm8916-sec-gtel-vzw-r00.dtb
-		dtb-y += msm8916-sec-gtel-vzw-r01.dtb
-		dtb-y += msm8916-sec-gtel-vzw-r02.dtb
-		dtb-y += msm8916-sec-gtel-vzw-r03.dtb
-	endif
-endif
 endif
 
 ifeq ($(CONFIG_SEC_FORTUNA_PROJECT),y)
-	ifeq ($(CONFIG_MACH_FORTUNA_TFN),y)
-		dtb-y += msm8916-sec-fortuna-tfn-r00.dtb
-		dtb-y += msm8916-sec-fortuna-tfn-r02.dtb
-	else ifeq ($(CONFIG_MACH_FORTUNA_USC),y)
-		dtb-y += msm8916-sec-fortuna-usc-r00.dtb
-		dtb-y += msm8916-sec-fortuna-usc-r01.dtb
-		dtb-y += msm8916-sec-fortuna-usc-r03.dtb
-	else ifeq ($(CONFIG_MACH_FORTUNA_TMO),y)
-                dtb-y += msm8916-sec-fortuna-tmo-r00.dtb
-                dtb-y += msm8916-sec-fortuna-tmo-r02.dtb
-	else ifeq ($(CONFIG_MACH_FORTUNA_SPR),y)
-                dtb-y += msm8916-sec-fortuna-spr-r00.dtb
-        endif
-
+	ifeq ($(CONFIG_MACH_FORTUNA_EUR_OPEN),y)
+		dtb-y += msm8916-sec-fortuna-eur-r00.dtb
+		dtb-y += msm8916-sec-fortuna-eur-r01.dtb
+		dtb-y += msm8916-sec-fortuna-eur-r02.dtb
+	else ifeq ($(CONFIG_MACH_FORTUNA3G_EUR),y)
+		dtb-y += msm8916-sec-fortuna-r00.dtb
+		dtb-y += msm8916-sec-fortuna-r01.dtb
+		dtb-y += msm8916-sec-fortuna-r03.dtb
+		dtb-y += msm8916-sec-fortuna-r04.dtb
+		dtb-y += msm8916-sec-fortuna-r06.dtb
+		dtb-y += msm8916-sec-fortuna-r07.dtb
+		dtb-y += msm8916-sec-fortuna-r09.dtb
+		dtb-y += msm8916-sec-fortuna-r11.dtb
+	else ifeq ($(CONFIG_MACH_FORTUNAVE3G_EUR),y)
+		dtb-y += msm8916-sec-fortuna-ve3g-r07.dtb
+	endif
 endif
 
-ifeq ($(CONFIG_SEC_ROSSA_PROJECT),y)
-	ifeq ($(CONFIG_MACH_ROSSA_TMO),y)
-		dtb-y += msm8916-sec-rossatmo-r00.dtb
+ifeq ($(CONFIG_SEC_A3_EUR_PROJECT),y)
+	dtb-y += msm8916-sec-a3-eur-r00.dtb
+	dtb-y += msm8916-sec-a3-eur-r01.dtb
+endif
+
+ifeq ($(CONFIG_SEC_A3_PROJECT),y)
+	dtb-y += msm8916-sec-a3-r00.dtb
+	dtb-y += msm8916-sec-a3-r01.dtb
+	dtb-y += msm8916-sec-a3-r03.dtb
+endif
+
+ifeq ($(CONFIG_SEC_A33G_EUR_PROJECT),y)
+	ifeq ($(CONFIG_MACH_A33G_EUR_OPEN),y)
+		dtb-y += msm8916-sec-a33g-eur-r00.dtb
+		dtb-y += msm8916-sec-a33g-eur-r01.dtb
+		dtb-y += msm8916-sec-a33g-eur-r03.dtb
+		dtb-y += msm8916-sec-a33g-eur-r04.dtb
 	endif
 endif
 
@@ -217,6 +95,28 @@ ifeq ($(CONFIG_SEC_J1_PROJECT),y)
 	endif
 endif
 
+ifeq ($(CONFIG_SEC_J5_PROJECT),y)
+	ifeq ($(CONFIG_MACH_J5LTE_EUR_OPEN),y)
+		dtb-y += msm8916-sec-j5lte-eur-r00.dtb
+		dtb-y += msm8916-sec-j5lte-eur-r01.dtb
+	else ifeq ($(CONFIG_MACH_J53G_EUR_OPEN),y)
+		dtb-y += msm8916-sec-j53g-eur-r00.dtb
+		dtb-y += msm8916-sec-j53g-eur-r01.dtb
+		dtb-y += msm8916-sec-j53g-eur-r02.dtb
+	else ifeq ($(CONFIG_MACH_J5LTE_CHN_CMCC),y)
+		dtb-y += msm8916-sec-j5lte-chn-r00.dtb
+		dtb-y += msm8916-sec-j5lte-chn-r01.dtb
+	else ifeq ($(CONFIG_MACH_J5LTE_KOR_OPEN),y)
+		dtb-y += msm8916-sec-j5lte-kor-r01.dtb
+	endif
+endif
+
+ifeq ($(CONFIG_SEC_NOVEL_PROJECT),y)
+	ifeq ($(CONFIG_MACH_NOVEL_KOR_OPEN),y)
+		dtb-y += msm8916-sec-novel-kx-r00.dtb
+		dtb-y += msm8916-sec-novel-kx-r01.dtb
+	endif
+endif
 dtb-$(CONFIG_ARCH_MSM8226) += msm8226-sim.dtb \
 	msm8226-fluid.dtb \
 	msm8226-v1-cdp.dtb \
@@ -292,7 +192,9 @@ dtb-$(CONFIG_ARCH_MSMZIRC) += msmzirc-sim.dtb \
 	msmzirc-cdp.dtb \
 	msmzirc-mtp.dtb
 dtb-$(CONFIG_ARCH_MDMFERRUM) += mdmferrum-sim.dtb \
-	mdmferrum-rumi.dtb
+	mdmferrum-rumi.dtb \
+	mdmferrum-cdp.dtb \
+	mdmferrum-mtp.dtb
 dtb-$(CONFIG_ARCH_APQ8084) += apq8084-v1.0-old-pwr-grid-liquid.dtb \
 	apq8084-v1.1-old-pwr-grid-liquid.dtb \
 	apq8084-v1.1-liquid.dtb \
@@ -359,9 +261,11 @@ targets += dtbs
 targets += $(addprefix ../, $(DTB_LIST))
 endif
 
+# Samsung modify 2 depth for msm8916,msm8939
 $(obj)/../../%.dtb: $(src)/%.dts FORCE
 	$(call if_changed_dep,dtc)
 
+# Samsung modify 2 depth for msm8916,msm8939
 dtbs: $(addprefix $(obj)/../../,$(DTB_LIST))
 
 clean-files := *.dtb

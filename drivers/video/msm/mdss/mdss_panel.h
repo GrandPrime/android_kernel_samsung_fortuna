@@ -17,8 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/stringify.h>
 #include <linux/types.h>
-#include <linux/lcd.h>
-#include <dlog.h>
+
 /* panel id type */
 struct panel_id {
 	u16 id;
@@ -183,6 +182,8 @@ struct mdss_intf_recovery {
  *				- 1: update to command mode
  * @MDSS_EVENT_REGISTER_RECOVERY_HANDLER: Event to recover the interface in
  *					case there was any errors detected.
+ * @MDSS_EVENT_INTF_RESTORE: Event to restore the interface in case there
+ *				was any errors detected during normal operation.
  */
 enum mdss_intf_events {
 	MDSS_EVENT_RESET = 1,
@@ -205,6 +206,7 @@ enum mdss_intf_events {
 	MDSS_EVENT_DSI_STREAM_SIZE,
 	MDSS_EVENT_DSI_DYNAMIC_SWITCH,
 	MDSS_EVENT_REGISTER_RECOVERY_HANDLER,
+	MDSS_EVENT_INTF_RESTORE,
 #if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
 	MDSS_SAMSUNG_EVENT_FRAME_UPDATE,
 	MDSS_SAMSUNG_EVENT_FB_EVENT_CALLBACK,
@@ -295,7 +297,6 @@ struct mipi_panel_info {
 	char lp11_init;
 	u32  init_delay;
 	u32  power_off_delay;
-	u32  additional_delay;
 };
 
 struct edp_panel_info {
@@ -377,11 +378,6 @@ struct mdss_panel_info {
 	u32 rst_seq[MDSS_DSI_RST_SEQ_LEN];
 	u32 rst_seq_len;
 	u32 vic; /* video identification code */
-	u32 roi_x;
-	u32 roi_y;
-	u32 roi_w;
-	u32 roi_h;
-	int bklt_ctrl;	/* backlight ctrl */
 	struct mdss_rect roi;
 	int pwm_pmic_gpio;
 	int pwm_lpg_chan;
@@ -412,7 +408,6 @@ struct mdss_panel_info {
 	u32 partial_update_roi_merge;
 	struct ion_handle *splash_ihdl;
 	int panel_power_state;
-	u32 panel_power_on;
 	int blank_state;
 
 	uint32_t panel_dead;
@@ -456,7 +451,6 @@ struct mipi_samsung_driver_data {
 	void *mdss_panel_data;
 	void *mdss_dsi_ctrl_pdata;
 };
-
 struct mdss_panel_data {
 	struct mdss_panel_info panel_info;
 	void (*set_backlight) (struct mdss_panel_data *pdata, u32 bl_level);

@@ -953,7 +953,7 @@ static int msm_tlmm_gp_irq_suspend(void)
 	return 0;
 }
 
-void msm_tlmm_gp_show_resume_irq(void)
+void msm_tlmm_v4_gp_show_resume_irq()
 {
 	unsigned long irq_flags;
 	unsigned int virq = 0;
@@ -978,6 +978,7 @@ void msm_tlmm_gp_show_resume_irq(void)
 
 	spin_unlock_irqrestore(&ic->irq_lock, irq_flags);
 }
+
 static void msm_tlmm_gp_irq_resume(void)
 {
 	unsigned long irq_flags;
@@ -985,7 +986,6 @@ static void msm_tlmm_gp_irq_resume(void)
 	struct msm_tlmm_irq_chip *ic = &msm_tlmm_gp_irq;
 	int num_irqs = ic->num_irqs;
 
-	msm_tlmm_gp_show_resume_irq();
 	spin_lock_irqsave(&ic->irq_lock, irq_flags);
 	for_each_set_bit(i, ic->wake_irqs, num_irqs)
 		msm_tlmm_set_intr_cfg_enable(ic, i, 0);

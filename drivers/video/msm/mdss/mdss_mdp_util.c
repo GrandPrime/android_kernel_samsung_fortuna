@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -613,6 +613,7 @@ static int mdss_mdp_map_buffer(struct mdss_mdp_img_data *data)
 {
 	int ret = -EINVAL;
 	struct ion_client *iclient = mdss_get_ionclient();
+	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 
 	if (data->addr && data->len)
 		return 0;
@@ -624,6 +625,9 @@ static int mdss_mdp_map_buffer(struct mdss_mdp_img_data *data)
 				domain = MDSS_IOMMU_DOMAIN_SECURE;
 			else
 				domain = MDSS_IOMMU_DOMAIN_UNSECURE;
+
+			if (domain == MDSS_IOMMU_DOMAIN_SECURE)
+				__mdss_restore_sec_cfg(mdata);
 
 			ret = ion_map_iommu(iclient, data->srcp_ihdl,
 						mdss_get_iommu_domain(domain),
@@ -715,7 +719,11 @@ void mdss_mdp_data_free(struct mdss_mdp_data *data)
 	int i;
 
 	for (i = 0; i < data->num_planes && data->p[i].len; i++)
+	{
+		mdss_iommu_ctrl(1);
 		mdss_mdp_put_img(&data->p[i]);
+		mdss_iommu_ctrl(0);
+	}
 
 	data->num_planes = 0;
 }
@@ -723,7 +731,6 @@ void mdss_mdp_data_free(struct mdss_mdp_data *data)
 int mdss_mdp_calc_phase_step(u32 src, u32 dst, u32 *out_phase)
 {
 	u32 unit, residue, result;
-        struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 
 	if (src == 0 || dst == 0)
 		return -EINVAL;
@@ -732,7 +739,7 @@ int mdss_mdp_calc_phase_step(u32 src, u32 dst, u32 *out_phase)
 	*out_phase = mult_frac(unit, src, dst);
 
 	/* check if overflow is possible */
-	if ((mdata->mdp_rev < MDSS_MDP_HW_REV_103) && src > dst) {
+	if (src > dst) {
 		residue = *out_phase - unit;
 		result = (residue * dst) + residue;
 

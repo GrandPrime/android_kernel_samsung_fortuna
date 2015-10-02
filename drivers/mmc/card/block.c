@@ -1615,7 +1615,7 @@ static int mmc_blk_err_check(struct mmc_card *card,
 			 * CMD25 -> CMD13 (WP violation) -> next CMD (illegal CMD)
 			 * need to change card status (rcv->tran)
 			 */
-			if ((status & R1_WP_VIOLATION) &&
+			if ((status & R1_WP_VIOLATION) && 
 					(R1_CURRENT_STATE(status) == R1_STATE_RCV)) {
 				pr_err("%s: WP violation. send CMD12 to "
 						"change card status (rcv->tran)\n",
@@ -2725,13 +2725,14 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 				disable_multi = 1;
 				break;
 			}
+
 			/*
 			 * case : SDcard Sector 0 read timeout even single read
 			 * skip reading other blocks.
 			 */
 			if (mmc_card_sd(card) &&
-					(unsigned)blk_rq_pos(req) == 0 &&
-					brq->data.error == -ETIMEDOUT)
+				(unsigned)blk_rq_pos(req) == 0 &&
+				brq->data.error == -ETIMEDOUT)
 				goto cmd_abort;
 
 			/*
@@ -2998,7 +2999,7 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 		    (mmc_card_sd(card) &&
 		     card->scr.cmds & SD_SCR_CMD23_SUPPORT &&
 			mmc_sd_card_uhs(card)))
-				md->flags |= MMC_BLK_CMD23;
+			md->flags |= MMC_BLK_CMD23;
 	}
 
 	if (mmc_card_mmc(card) &&
@@ -3312,7 +3313,7 @@ static const struct mmc_fixup blk_fixups[] =
 
 #ifdef CONFIG_MMC_SUPPORT_BKOPS_MODE
 static ssize_t bkops_mode_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
+	struct device_attribute *attr, char *buf)
 {
 	struct gendisk *disk;
 	struct mmc_blk_data *md;
@@ -3337,7 +3338,7 @@ show_out:
 }
 
 static ssize_t bkops_mode_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
+	struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct gendisk *disk;
 	struct mmc_blk_data *md;
@@ -3385,19 +3386,19 @@ static inline void mmc_blk_bkops_sysfs_init(struct mmc_card *card)
 
 	if (device_create_file((disk_to_dev(md->disk)), &card->bkops_attr)) {
 		pr_err("%s: Failed to create bkops_en sysfs entry\n",
-				mmc_hostname(card->host));
+			mmc_hostname(card->host));
 #if defined(CONFIG_MMC_BKOPS_NODE_UID) || defined(CONFIG_MMC_BKOPS_NODE_GID)
 	} else {
 		int rc;
 		struct device * dev;
 
-		dev = disk_to_dev(md->disk);
-		rc = sysfs_chown_file(&dev->kobj, &card->bkops_attr.attr,
-				      CONFIG_MMC_BKOPS_NODE_UID,
-				      CONFIG_MMC_BKOPS_NODE_GID);
-		if (rc)
-			pr_err("%s: Failed to change mode of sysfs entry\n",
-					mmc_hostname(card->host));
+	dev = disk_to_dev(md->disk);
+	rc = sysfs_chown_file(&dev->kobj, &card->bkops_attr.attr,
+		      CONFIG_MMC_BKOPS_NODE_UID, 
+		      CONFIG_MMC_BKOPS_NODE_GID); 
+	if (rc)
+		pr_err("%s: Failed to change mode of sysfs entry\n",
+			mmc_hostname(card->host));
 #endif
 	}
 }
@@ -3406,6 +3407,7 @@ static inline void mmc_blk_bkops_sysfs_init(struct mmc_card *card)
 {
 }
 #endif
+
 
 static int mmc_blk_probe(struct mmc_card *card)
 {
@@ -3424,6 +3426,7 @@ static int mmc_blk_probe(struct mmc_card *card)
 
 	string_get_size((u64)get_capacity(md->disk) << 9, STRING_UNITS_2,
 			cap_str, sizeof(cap_str));
+
 	pr_info("[%s]%s: %s %s %s %s, card->type:%d\n", __func__,
 		md->disk->disk_name, mmc_card_id(card), mmc_card_name(card),
 		cap_str, md->read_only ? "(ro)" : "", card->type);

@@ -20,7 +20,7 @@
 #include "msm_sd.h"
 
 /* Logging macro */
-/*#define CONFIG_MSMB_CAMERA_DEBUG*/
+//#define CONFIG_MSMB_CAMERA_DEBUG
 #undef CDBG
 #ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
@@ -153,8 +153,6 @@ static ssize_t back_camera_type_show(struct device *dev,
 	char type[] = "SONY_IMX135\n";
 #elif defined(CONFIG_SR544)
 	char type[] = "SILICONFILE_SR544\n";
-#elif defined(CONFIG_S5K3P3SX)
-	char type[] = "SLSI_S5K3P3SX\n";
 #else
 	char type[] = "NULL\n";
 #endif
@@ -171,6 +169,8 @@ static ssize_t front_camera_type_show(struct device *dev,
 	char cam_type[] = "SLSI_S5K5E3YX\n";
 #elif defined(CONFIG_SR200PC20)
 	char cam_type[] = "SILICONFILE_SR200PC20\n";
+#elif defined(CONFIG_S5K6B2YX)
+	char cam_type[] = "SLSI_S5K6B2YX\n";
 #else
 	char cam_type[] = "NULL\n";
 #endif
@@ -321,10 +321,8 @@ static ssize_t front_camera_firmware_load_store(struct device *dev,
 			struct device_attribute *attr, const char *buf, size_t size)
 {
 	CDBG("[FW_DBG] buf : %s\n", buf);
-	//snprintf(front_cam_load_fw, sizeof(front_cam_load_fw), "%s\n", buf);
 	return size;
 }
-
 char front_cam_fw_full_ver[40] = "S5K5E3YX N N\n";//multi module
 static ssize_t front_camera_firmware_full_show(struct device *dev,
 			struct device_attribute *attr, char *buf)
@@ -336,7 +334,6 @@ static ssize_t front_camera_firmware_full_store(struct device *dev,
 			struct device_attribute *attr, const char *buf, size_t size)
 {
 	CDBG("[FW_DBG] buf : %s\n", buf);
-	//snprintf(front_cam_fw_full_ver, sizeof(front_cam_fw_full_ver), "%s", buf);
 	return size;
 }
 #else
@@ -370,7 +367,6 @@ static ssize_t front_camera_firmware_full_store(struct device *dev,
 	return size;
 }
 #endif
-
 static DEVICE_ATTR(rear_camtype, S_IRUGO, back_camera_type_show, NULL);
 static DEVICE_ATTR(rear_camfw, S_IRUGO|S_IWUSR|S_IWGRP,
     back_camera_firmware_show, back_camera_firmware_store);

@@ -170,8 +170,6 @@ static int mdss_mdp_parse_dt_prefill(struct platform_device *pdev);
 static int mdss_mdp_parse_dt_misc(struct platform_device *pdev);
 static int mdss_mdp_parse_dt_ad_cfg(struct platform_device *pdev);
 static int mdss_mdp_parse_dt_bus_scale(struct platform_device *pdev);
-static int mdss_iommu_attach(struct mdss_data_type *mdata);
-static int mdss_iommu_dettach(struct mdss_data_type *mdata);
 
 /**
  * mdss_mdp_vbif_axi_halt() - Halt MDSS AXI ports
@@ -316,9 +314,7 @@ static void mdss_mdp_bus_scale_unregister(struct mdss_data_type *mdata)
 		mdata->reg_bus_hdl = 0;
 	}
 }
-#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-u64 bus_ab_quota_dbg, bus_ib_quota_dbg;
-#endif
+
 static int mdss_mdp_bus_scale_set_quota(u64 ab_quota_rt, u64 ab_quota_nrt,
 		u64 ib_quota_rt, u64 ib_quota_nrt)
 {
@@ -387,10 +383,6 @@ static int mdss_mdp_bus_scale_set_quota(u64 ab_quota_rt, u64 ab_quota_nrt,
 			vect = &bw_table->usecase[new_uc_idx].vectors[i];
 			vect->ab = ab_quota[i];
 			vect->ib = ib_quota[i];
-#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-			bus_ab_quota_dbg = vect->ab;
-			bus_ib_quota_dbg = vect->ib;
-#endif
 			pr_debug("uc_idx=%d %s path idx=%d ab=%llu ib=%llu\n",
 				new_uc_idx, (i < rt_axi_port_cnt) ? "rt" : "nrt"
 				, i, vect->ab, vect->ib);
@@ -674,18 +666,18 @@ int mdss_iommu_ctrl(int enable)
 		__builtin_return_address(0), enable, mdata->iommu_ref_cnt);
 
 	if (enable) {
-		if (mdata->iommu_ref_cnt == 0) {
-			mdss_bus_scale_set_quota(MDSS_HW_IOMMU, SZ_1M, SZ_1M);
+		/*
+		 * delay iommu attach until continous splash screen has
+		 * finished handoff, as it may still be working with phys addr
+		 */
+		if (!mdata->iommu_attached && !mdata->handoff_pending)
 			rc = mdss_iommu_attach(mdata);
-		}
 		mdata->iommu_ref_cnt++;
 	} else {
 		if (mdata->iommu_ref_cnt) {
 			mdata->iommu_ref_cnt--;
-			if (mdata->iommu_ref_cnt == 0) {
+			if (mdata->iommu_ref_cnt == 0)
 				rc = mdss_iommu_dettach(mdata);
-				mdss_bus_scale_set_quota(MDSS_HW_IOMMU, 0, 0);
-			}
 		} else {
 			pr_err("unbalanced iommu ref\n");
 		}
@@ -851,9 +843,7 @@ static inline int mdss_mdp_irq_clk_register(struct mdss_data_type *mdata,
 	return 0;
 }
 
-#define SEC_DEVICE_MDSS		1
-
-static void __mdss_restore_sec_cfg(struct mdss_data_type *mdata)
+void __mdss_restore_sec_cfg(struct mdss_data_type *mdata)
 {
 	int ret, scm_ret = 0;
 
@@ -949,7 +939,7 @@ static int mdss_mdp_irq_clk_setup(struct mdss_data_type *mdata)
 	return 0;
 }
 
-static int mdss_iommu_attach(struct mdss_data_type *mdata)
+int mdss_iommu_attach(struct mdss_data_type *mdata)
 {
 	struct iommu_domain *domain;
 	struct mdss_iommu_map_type *iomap;
@@ -988,7 +978,7 @@ end:
 	return rc;
 }
 
-static int mdss_iommu_dettach(struct mdss_data_type *mdata)
+int mdss_iommu_dettach(struct mdss_data_type *mdata)
 {
 	struct iommu_domain *domain;
 	struct mdss_iommu_map_type *iomap;
@@ -1018,7 +1008,7 @@ static int mdss_iommu_dettach(struct mdss_data_type *mdata)
 	return 0;
 }
 
-static int mdss_iommu_init(struct mdss_data_type *mdata)
+int mdss_iommu_init(struct mdss_data_type *mdata)
 {
 	struct msm_iova_layout layout;
 	struct iommu_domain *domain;
@@ -1506,13 +1496,12 @@ static int mdss_mdp_probe(struct platform_device *pdev)
 		(int) (unsigned long) mdata->mdss_io.base,
 		mdata->mdss_io.len);
 
-
 	rc = msm_dss_ioremap_byname(pdev, &mdata->vbif_io, "vbif_phys");
 	if (rc) {
 		pr_err("unable to map MDSS VBIF base\n");
 		goto probe_done;
 	}
-	pr_debug("MDSS VBIF HW Base addr=0x%x len=0x%x\n",
+	pr_err("MDSS VBIF HW Base addr=0x%x len=0x%x\n",
 		(int) (unsigned long) mdata->vbif_io.base,
 		mdata->vbif_io.len);
 
@@ -1670,10 +1659,6 @@ int mdss_mdp_parse_dt_hw_settings(struct platform_device *pdev)
 			hws, vbif_nrt_len);
 	mdss_mdp_parse_dt_regs_array(mdp_arr, &mdata->mdss_io,
 		hws + vbif_len, mdp_len);
-
-#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-	mdata->mdss_io.base = mdata->mdss_base;
-#endif
 
 	mdata->hw_settings = hws;
 
@@ -3039,14 +3024,6 @@ static void mdss_mdp_footswitch_ctrl(struct mdss_data_type *mdata, int on)
 		mdata->fs_ena = false;
 	}
 }
-
-#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-void mdss_mdp_underrun_clk_info(void)
-{
-	pr_info(" mdp_clk = %ld, bus_ab = %llu, bus_ib = %llu\n",
-		mdss_mdp_get_clk_rate(MDSS_CLK_MDP_SRC), bus_ab_quota_dbg, bus_ib_quota_dbg);
-}
-#endif
 
 int mdss_mdp_secure_display_ctrl(unsigned int enable)
 {

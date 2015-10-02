@@ -63,7 +63,7 @@
 #define ERROR		-1
 #define CAL_SKIP_ADC	8
 #define CAL_FAIL_ADC	18
-#define CANCELATION_FILE_PATH	"/efs/prox_cal"
+#define CANCELATION_FILE_PATH	"/efs/FactoryApp/prox_cal"
 #endif
 
 #define PROX_READ_NUM	40
@@ -74,7 +74,12 @@
 #define CANCEL_HI_THD	0x0022
 #define CANCEL_LOW_THD	0x001E
 
+#ifdef CONFIG_MACH_J1_VZW
+#define DEFAULT_CONF1	0x03A0
+#else
 #define DEFAULT_CONF1	0x0320
+#endif
+
 #define DEFAULT_CONF3	0x4200
 #define DEFAULT_TRIM	0x0000
 
@@ -127,17 +132,17 @@ struct cm36672p_data {
 	struct workqueue_struct *prox_wq;
 	struct work_struct work_prox;
 	struct device *proximity_dev;
-#if defined(CONFIG_MACH_J1_VZW) || defined(CONFIG_MACH_E5_USA_TFN)
 	struct regulator *vdd;
 	struct regulator *vio;
-#endif
 	ktime_t prox_poll_delay;
 	atomic_t enable;
 	int irq;
 	int avg[3];
 	unsigned int uProxCalResult;
+#ifdef CONFIG_SENSORS_CM36672P_PMIC_LEDA
+		struct regulator *leden_3p0;
+#endif
 };
-
 static int proximity_regulator_onoff(struct device *dev, bool onoff);
 
 int cm36672p_i2c_read_word(struct cm36672p_data *data, u8 command, u16 *val)
@@ -206,6 +211,37 @@ static int leden_gpio_onoff(struct cm36672p_data *data, bool onoff)
 		msleep(20);
 
 	return 0;
+}
+#elif defined(CONFIG_SENSORS_CM36672P_PMIC_LEDA)
+static void cm36672p_pmic_leda_onoff(struct cm36672p_data *info, int onoff)
+{
+	int ret;
+
+	pr_err("%s %s\n", __func__, (onoff) ? "on" : "off");
+
+	if (info->leden_3p0 == NULL) {
+		info->leden_3p0 = regulator_get(&info->i2c_client->dev,
+			"PROX_LEDA_3.0V");
+		if (IS_ERR(info->leden_3p0)) {
+			pr_err("%s: regulator_get failed for PROX_LEDA_3.0V\n",
+				__func__);
+				return;
+		}
+	}
+
+	if (onoff) {
+		ret = regulator_enable(info->leden_3p0);
+		if (ret)
+			pr_err("%s: leda_3p3 enable failed (%d)\n",
+				__func__, ret);
+	} else {
+		ret = regulator_disable(info->leden_3p0);
+		if (ret)
+			pr_err("%s: leden_3p0 disable failed (%d)\n",
+				__func__, ret);
+	}
+	msleep(20);
+	return;
 }
 #endif
 
@@ -328,21 +364,21 @@ static int proximity_store_cancelation(struct device *dev, bool do_calib)
 	}
 
 	if ((data->uProxCalResult == 1) || !do_calib) {
-	err = cm36672p_i2c_write_word(data, REG_PS_CANC,
-		ps_reg_init_setting[PS_CANCEL][CMD]);
-	if (err < 0)
-		pr_err("%s, ps_canc_reg is failed. %d\n", __func__,
-			err);
-	err = cm36672p_i2c_write_word(data, REG_PS_THD_HIGH,
-		ps_reg_init_setting[PS_THD_HIGH][CMD]);
-	if (err < 0)
-		pr_err("%s: ps_high_reg is failed. %d\n", __func__,
-			err);
-	err = cm36672p_i2c_write_word(data, REG_PS_THD_LOW,
-		ps_reg_init_setting[PS_THD_LOW][CMD]);
-	if (err < 0)
-		pr_err("%s: ps_low_reg is failed. %d\n", __func__,
-			err);
+		err = cm36672p_i2c_write_word(data, REG_PS_CANC,
+			ps_reg_init_setting[PS_CANCEL][CMD]);
+		if (err < 0)
+			pr_err("%s, ps_canc_reg is failed. %d\n", __func__,
+				err);
+		err = cm36672p_i2c_write_word(data, REG_PS_THD_HIGH,
+			ps_reg_init_setting[PS_THD_HIGH][CMD]);
+		if (err < 0)
+			pr_err("%s: ps_high_reg is failed. %d\n", __func__,
+				err);
+		err = cm36672p_i2c_write_word(data, REG_PS_THD_LOW,
+			ps_reg_init_setting[PS_THD_LOW][CMD]);
+		if (err < 0)
+			pr_err("%s: ps_low_reg is failed. %d\n", __func__,
+				err);
 	}
 
 	pr_info("%s: prox_cal = 0x%x, ps_high_thresh = 0x%x, ps_low_thresh = 0x%x\n",
@@ -448,9 +484,7 @@ static ssize_t proximity_enable_store(struct device *dev,
 	if (new_value && !pre_enable) {
 		int i, ret;
 
-#if defined(CONFIG_MACH_J1_VZW) || defined(CONFIG_MACH_E5_USA_TFN)
 		proximity_regulator_onoff(dev, ON);
-#endif
 		atomic_set(&data->enable, ON);
 #if defined(CONFIG_SENSORS_LEDA_EN_GPIO)
 		leden_gpio_onoff(data, ON);
@@ -484,9 +518,7 @@ static ssize_t proximity_enable_store(struct device *dev,
 		leden_gpio_onoff(data, OFF);
 #endif
 		atomic_set(&data->enable, OFF);
-#if defined(CONFIG_MACH_J1_VZW) || defined(CONFIG_MACH_E5_USA_TFN)
 		proximity_regulator_onoff(dev, OFF);
-#endif
 	}
 	pr_info("%s, enable = %d\n", __func__, atomic_read(&data->enable));
 
@@ -902,18 +934,12 @@ static int setup_irq_cm36672p(struct cm36672p_data *data)
 
 static int proximity_regulator_onoff(struct device *dev, bool onoff)
 {
-#if defined(CONFIG_MACH_J1_VZW) || defined(CONFIG_MACH_E5_USA_TFN)
 	struct cm36672p_data *data = dev_get_drvdata(dev);
-#else
-	struct regulator *vdd;
-	struct regulator *vio;
-#endif
 	int ret;
 
 	pr_info("%s %s\n", __func__, (onoff) ? "on" : "off");
 
-#if defined(CONFIG_MACH_J1_VZW) || defined(CONFIG_MACH_E5_USA_TFN)
-	if (!data->vdd){
+	if (!data->vdd) {
 		pr_info("%s VDD get regulator\n", __func__);
 		data->vdd = devm_regulator_get(dev, "cm36672p,vdd");
 		if (IS_ERR(data->vdd)) {
@@ -922,18 +948,8 @@ static int proximity_regulator_onoff(struct device *dev, bool onoff)
 		}
 		regulator_set_voltage(data->vdd, 2850000, 2850000);
 	}
-#else
-	vdd = devm_regulator_get(dev, "cm36672p,vdd");
-	if (IS_ERR(vdd)) {
-		pr_err("%s, cannot get vdd\n", __func__);
-		return -ENOMEM;
-	} else if (!regulator_get_voltage(vdd)) {
-		regulator_set_voltage(vdd, 2850000, 2850000);
-	}
-#endif
 
-#ifdef CONFIG_MACH_J1_VZW
-	if (!data->vio){
+	if (!data->vio) {
 		pr_info("%s VIO get regulator\n", __func__);
 		data->vio = devm_regulator_get(dev, "cm36672p,vio");
 		if (IS_ERR(data->vio)) {
@@ -943,59 +959,27 @@ static int proximity_regulator_onoff(struct device *dev, bool onoff)
 		}
 		regulator_set_voltage(data->vio, 1800000, 1800000);
 	}
-#elif !defined(CONFIG_MACH_E5_USA_TFN)
-	vio = devm_regulator_get(dev, "cm36672p,vio");
-	if (IS_ERR(vio)) {
-		pr_err("%s, cannot get vio\n", __func__);
-		devm_regulator_put(vdd);
-		return -ENOMEM;
-	} else if (!regulator_get_voltage(vio)) {
-		regulator_set_voltage(vio, 1800000, 1800000);
-	}
-#endif
 
 	if (onoff) {
-#if defined(CONFIG_MACH_J1_VZW) || defined(CONFIG_MACH_E5_USA_TFN)
 		ret = regulator_enable(data->vdd);
-#else
-		ret = regulator_enable(vdd);
-#endif
 		if (ret)
 			pr_err("%s: Failed to enable vdd.\n", __func__);
 		msleep(20);
-#ifdef CONFIG_MACH_J1_VZW
 		ret = regulator_enable(data->vio);
-#elif !defined(CONFIG_MACH_E5_USA_TFN)
-		ret = regulator_enable(vio);
-#endif
 		if (ret)
 			pr_err("%s: Failed to enable vio.\n", __func__);
 		msleep(20);
 	} else {
-#if defined(CONFIG_MACH_J1_VZW) || defined(CONFIG_MACH_E5_USA_TFN)
 		ret = regulator_disable(data->vdd);
-#else
-		ret = regulator_disable(vdd);
-#endif
 		if (ret)
 			pr_err("%s: Failed to disable vdd.\n", __func__);
 		msleep(20);
-#ifdef CONFIG_MACH_J1_VZW
 		ret = regulator_disable(data->vio);
-#elif !defined(CONFIG_MACH_E5_USA_TFN)
-		ret = regulator_disable(vio);
-#endif
 		if (ret)
 			pr_err("%s: Failed to disable vio.\n", __func__);
 		msleep(20);
 	}
 
-#if !defined(CONFIG_MACH_J1_VZW) && !defined(CONFIG_MACH_E5_USA_TFN)
-	pr_info("%s VDD & VIO put\n", __func__);
-	devm_regulator_put(vdd);
-	devm_regulator_put(vio);
-	msleep(20);
-#endif
 	return 0;
 }
 
@@ -1132,6 +1116,7 @@ static int cm36672p_i2c_probe(struct i2c_client *client,
 		goto exit;
 	}
 
+
 	data->pdata = pdata;
 	data->i2c_client = client;
 	i2c_set_clientdata(client, data);
@@ -1140,7 +1125,6 @@ static int cm36672p_i2c_probe(struct i2c_client *client,
 	/* wake lock init for proximity sensor */
 	wake_lock_init(&data->prx_wake_lock, WAKE_LOCK_SUSPEND,
 		"prx_wake_lock");
-
 	proximity_regulator_onoff(&client->dev, ON);
 
 #if defined(CONFIG_SENSORS_LEDA_EN_GPIO)
@@ -1151,6 +1135,8 @@ static int cm36672p_i2c_probe(struct i2c_client *client,
 		goto err_setup_leden_gpio;
 	}
 	leden_gpio_onoff(data, ON);
+#elif defined(CONFIG_SENSORS_CM36672P_PMIC_LEDA)
+	cm36672p_pmic_leda_onoff(data, ON);
 #endif
 
 	/* Check if the device is there or not. */
@@ -1243,10 +1229,7 @@ static int cm36672p_i2c_probe(struct i2c_client *client,
 		goto prox_sensor_register_failed;
 	}
 
-#if defined(CONFIG_MACH_J1_VZW) || defined(CONFIG_MACH_E5_USA_TFN)
 	proximity_regulator_onoff(&client->dev, OFF);
-#endif
-
 	pr_info("%s is success.\n", __func__);
 	return ret;
 
@@ -1297,23 +1280,17 @@ static int cm36672p_i2c_remove(struct i2c_client *client)
 
 	/* device off */
 	if (atomic_read(&data->enable))
-		cm36672p_i2c_write_word(data, REG_PS_CONF1,
-			0x0001);
+		cm36672p_i2c_write_word(data, REG_PS_CONF1, 0x0001);
 
-#if defined(CONFIG_MACH_J1_VZW) || defined(CONFIG_MACH_E5_USA_TFN)
-	if(data->vdd)
-	{
+	if (data->vdd) {
 		pr_info("%s VDD put\n", __func__);
 		devm_regulator_put(data->vdd);
 	}
 
-	if(data->vio)
-	{
+	if (data->vio) {
 		pr_info("%s VIO put\n", __func__);
 		devm_regulator_put(data->vio);
 	}
-#endif
-
 	/* destroy workqueue */
 	destroy_workqueue(data->prox_wq);
 
@@ -1337,9 +1314,6 @@ static int cm36672p_i2c_remove(struct i2c_client *client)
 	wake_lock_destroy(&data->prx_wake_lock);
 
 	kfree(data);
-#ifndef CONFIG_MACH_J1_VZW
-	proximity_regulator_onoff(&client->dev, OFF);
-#endif
 
 	return 0;
 }

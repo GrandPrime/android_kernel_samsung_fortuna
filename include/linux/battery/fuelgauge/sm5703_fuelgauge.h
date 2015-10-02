@@ -28,9 +28,9 @@
 
 struct battery_data_t {
 	const int battery_type; /* 4200 or 4350 or 4400*/
-	const int battery_table[3][16];
-	const int rce_value[3];
-	const int dtcd_value;
+    const int battery_table[3][16];
+    const int rce_value[3];
+    const int dtcd_value;
 	const int rs_value[4];
 	const int vit_period;
 	const int mix_value[2];
@@ -67,31 +67,30 @@ struct sec_fg_info {
 
 	struct mutex io_lock;
 	struct device *dev;
-	int32_t temperature; /* 0.1 deg C*/
-	int32_t temp_fg; /* 0.1 deg C*/
+	int32_t temperature;; /* 0.1 deg C*/
 	/* register programming */
 	int reg_addr;
 	u8 reg_data[2];
 
-	int battery_table[3][16];
-	int rce_value[3];
-	int dtcd_value;
-	int rs_value[4]; /*rs mix_factor max min*/
-	int vit_period;
-	int mix_value[2]; /*mix_rate init_blank*/
+    int battery_table[3][16];
+    int rce_value[3];
+    int dtcd_value;
+    int rs_value[4]; /*rs mix_factor max min*/
+    int vit_period;
+    int mix_value[2]; /*mix_rate init_blank*/
 
-	int enable_topoff_soc;
-	int topoff_soc;
+    int enable_topoff_soc;
+    int topoff_soc;
 
-	int volt_cal;
-	int curr_cal;
+    int volt_cal;
+    int curr_cal;
 
-	int temp_std;
-	int temp_offset;
-	int temp_offset_cal;
-	int charge_offset_cal;
+    int temp_std;
+    int temp_offset;
+    int temp_offset_cal;
+    int charge_offset_cal;
 
-	int battery_type; /* 4200 or 4350 or 4400*/
+    int battery_type; /* 4200 or 4350 or 4400*/
 	uint32_t soc_alert_flag : 1;  /* 0 : nu-occur, 1: occur */
 	uint32_t volt_alert_flag : 1; /* 0 : nu-occur, 1: occur */
 	uint32_t flag_full_charge : 1; /* 0 : no , 1 : yes*/
@@ -100,9 +99,6 @@ struct sec_fg_info {
 	int32_t irq_ctrl;
 
 	uint32_t is_FG_initialised;
-	int iocv_error_count;
-	/* previous battery voltage */
-	int p_batt_voltage;
 };
 
 struct sec_fuelgauge_info {
@@ -167,7 +163,7 @@ ssize_t sec_fg_store_attrs(struct device *dev,
 
 
 #ifdef CONFIG_OF
-extern void board_fuelgauge_init(void *fuelgauge);
+extern void board_fuelgauge_init(struct sec_fuelgauge_info *fuelgauge);
 extern bool sec_bat_check_jig_status(void);
 #endif
 

@@ -43,7 +43,7 @@
 #define DET_CHECK_TIME_MS	   100		/* 100ms */
 #define DET_CHECK_TIME_MS_WITH_FSA 50		/* 50ms */
 #define WAKE_LOCK_TIME		(HZ * 5)	/* 5 sec */
-#define ADC_SAMPLE_CNT		1   /* Ear key ADC chekc count */
+#define ADC_SAMPLE_CNT		8   /* Ear ADC avg 6 times (except max, min) */
 
 struct sec_jack_info {
 	struct platform_device *client;
@@ -145,33 +145,6 @@ int ear_adc_value = 0;
 /*Enabling Ear Mic Bias of WCD Codec*/
 extern void msm8x16_enable_ear_micbias(bool state);
 
-#ifdef CONFIG_DYNAMIC_MICBIAS_CONTROL
-static int atof(const char *str)
-{
-	int result = 0;
-	int count = 0;
-
-	while (str[count] != 0	/* NULL */
-		&& ((str[count] >= '0' && str[count] <= '9') || str[count] == '.')) {
-		if (str[count] != '.')
-			result = result * 10 + str[count] - '0';
-
-		++count;
-	}
-
-	return result;
-}
-#endif
-#if defined(CONFIG_MACH_KOR_EARJACK_WR)
-extern void set_earjack_state(void);
-
-bool is_sec_earjack_on = false;
-bool sec_jack_onoff(void)
-{
-    return is_sec_earjack_on;
-}
-#endif
-
 static void sec_jack_gpio_init(struct sec_jack_platform_data *pdata)
 {
 	int ret;
@@ -195,6 +168,7 @@ static void sec_jack_gpio_init(struct sec_jack_platform_data *pdata)
 		}
 		gpio_direction_output(pdata->fsa_en_gpio, 1);
 	}
+
 
 }
 
@@ -396,10 +370,6 @@ static void sec_jack_set_type(struct sec_jack_info *hi, int jack_type)
 			--hi->ts.tv_sec;
 			hi->ts.tv_nsec += 1000000000L;
 		}
-#if defined(CONFIG_MACH_KOR_EARJACK_WR)
-		is_sec_earjack_on = true;
-		set_earjack_state();
-#endif
 		pr_info("%s: detect time : %d ms\n", __func__, (int)hi->ts.tv_nsec/1000000 );
 	}
 
@@ -458,10 +428,6 @@ static void determine_jack_type(struct sec_jack_info *hi)
 	/* jack removed before detection complete */
 	pr_debug("%s : jack removed before detection complete\n", __func__);
 	sec_jack_set_type(hi, SEC_JACK_NO_DEVICE);
-#if defined(CONFIG_MACH_KOR_EARJACK_WR)
-	is_sec_earjack_on = false;
-    set_earjack_state();
-#endif
 	set_sec_micbias_state(hi, false);
 }
 
@@ -900,9 +866,6 @@ void sec_jack_detect_work(struct work_struct *work)
 	unsigned npolarity = !hi->pdata->det_active_high;
 	int time_left_ms;
 
-#ifdef CONFIG_SAMSUNG_JACK_WATCH_DOG_RESET_WORK_AROUND
-        disable_irq(hi->det_irq);
-#endif /* CONFIG_SAMSUNG_JACK_WATCH_DOG_RESET_WORK_AROUND */
 	if (pdata->fsa_en_gpio < 0)
 		time_left_ms = DET_CHECK_TIME_MS;
 	else
@@ -925,14 +888,7 @@ void sec_jack_detect_work(struct work_struct *work)
 			/* restore micbias to 2.8V */
 			msm8x16_wcd_dynamic_control_micbias(MIC_BIAS_V2P80V);
 #endif
-#if defined(CONFIG_MACH_KOR_EARJACK_WR)
-			is_sec_earjack_on = false;
-			set_earjack_state();
-#endif
 			set_sec_micbias_state(hi, false);
-#ifdef CONFIG_SAMSUNG_JACK_WATCH_DOG_RESET_WORK_AROUND
-                       enable_irq(hi->det_irq);
-#endif /* CONFIG_SAMSUNG_JACK_WATCH_DOG_RESET_WORK_AROUND */
 			return;
 		}
 		usleep_range(10000, 10000);
@@ -942,14 +898,10 @@ void sec_jack_detect_work(struct work_struct *work)
 	/* jack presence was detected the whole time, figure out which type */
 	determine_jack_type(hi);
 #ifdef CONFIG_DYNAMIC_MICBIAS_CONTROL
-	/* Mic bias default dynamic voltage */
+	/* Mic bias default 2.2V */
 	if (hi->cur_jack_type == SEC_HEADSET_4POLE)
-		msm8x16_wcd_dynamic_control_micbias(pdata->dynamic_micb_ctrl_voltage);
+		msm8x16_wcd_dynamic_control_micbias(MIC_BIAS_V2P20V);
 #endif
-
-#ifdef CONFIG_SAMSUNG_JACK_WATCH_DOG_RESET_WORK_AROUND
-       enable_irq(hi->det_irq);
-#endif /* CONFIG_SAMSUNG_JACK_WATCH_DOG_RESET_WORK_AROUND */
 }
 
 /* thread run whenever the button of headset is pressed or released */
@@ -984,7 +936,7 @@ void sec_jack_buttons_work(struct work_struct *work)
 #ifdef CONFIG_DYNAMIC_MICBIAS_CONTROL
 		/* Mic bias must keep 2.8V when mic is enalbed */
 		if (!is_mic_enable())
-			msm8x16_wcd_dynamic_control_micbias(pdata->dynamic_micb_ctrl_voltage);
+			msm8x16_wcd_dynamic_control_micbias(MIC_BIAS_V2P20V);
 #endif
 		input_report_key(hi->input_dev, hi->pressed_code, 0);
 		input_sync(hi->input_dev);
@@ -1040,9 +992,6 @@ static struct sec_jack_platform_data *sec_jack_populate_dt_pdata(struct device *
 	struct of_phandle_args args;
 	int i = 0;
 	int ret = 0;
-#ifdef CONFIG_DYNAMIC_MICBIAS_CONTROL
-	const char *voltage_str;
-#endif
 	pdata =  devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
 		pr_err("%s : could not allocate memory for platform data\n", __func__);
@@ -1116,18 +1065,6 @@ static struct sec_jack_platform_data *sec_jack_populate_dt_pdata(struct device *
 	}
 	pr_info("%s - mpp-channel-scaling - %d %d %d\n", __func__, pdata->mpp_ch_scale[0], pdata->mpp_ch_scale[1], pdata->mpp_ch_scale[2]);
 
-#ifdef CONFIG_DYNAMIC_MICBIAS_CONTROL
-	ret = of_property_read_string(dev->of_node, "dynamic-micbias-ctrl-voltage", &voltage_str);
-	if (ret < 0) {
-		pr_err("%s : cannot find dynamic-micbias-ctrl-voltage in the dt - using default voltage (2.8V)\n",
-		__func__);
-		pdata->dynamic_micb_ctrl_voltage = MIC_BIAS_V2P80V;
-	}
-	else {
-		pdata->dynamic_micb_ctrl_voltage = set_dynamic_micb_ctrl_voltage(atof(voltage_str));
-	}
-	pr_info("%s - dynamic-micbias-ctrl-voltage - %d \n", __func__, pdata->dynamic_micb_ctrl_voltage);
-#endif
 	return pdata;
 
 alloc_err:
@@ -1427,11 +1364,29 @@ static int sec_jack_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM
 static int sec_jack_suspend(struct device *dev)
 {
+	struct sec_jack_info *hi = dev_get_drvdata(dev);
+	struct sec_jack_platform_data *pdata = hi->pdata;
+	if (pdata->jack_pinctrl) {
+		int ret = sec_jack_pinctrl_configure(pdata, false);
+		if (ret) {
+			dev_err(dev, "failed to put the pin in suspend state\n");
+		}
+	}
+
 	return 0;
 }
 
 static int sec_jack_resume(struct device *dev)
 {
+	struct sec_jack_info *hi = dev_get_drvdata(dev);
+	struct sec_jack_platform_data *pdata = hi->pdata;
+	if (pdata->jack_pinctrl) {
+		int ret = sec_jack_pinctrl_configure(pdata, true);
+		if (ret) {
+			dev_err(dev, "failed to put the pin in resume state\n");
+		}
+	}
+	
 	return 0;
 }
 

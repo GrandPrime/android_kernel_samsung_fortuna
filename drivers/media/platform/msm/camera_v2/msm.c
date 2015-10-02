@@ -34,7 +34,7 @@
 static struct v4l2_device *msm_v4l2_dev;
 static struct list_head    ordered_sd_list;
 
-#ifndef CONFIG_ARCH_MSM8939
+#if !defined(CONFIG_ARCH_MSM8939) && !defined(CONFIG_ARCH_MSM8929)
 static struct pm_qos_request msm_v4l2_pm_qos_request;
 #endif
 
@@ -196,7 +196,7 @@ static inline int __msm_queue_find_command_ack_q(void *d1, void *d2)
 	return (ack->stream_id == *(unsigned int *)d2) ? 1 : 0;
 }
 
-#ifndef CONFIG_ARCH_MSM8939
+#if !defined(CONFIG_ARCH_MSM8939) && !defined(CONFIG_ARCH_MSM8929)
 static void msm_pm_qos_add_request(void)
 {
 	pr_err("%s: add request",__func__);
@@ -853,7 +853,7 @@ static int msm_close(struct file *filep)
 		list_for_each_entry(msm_sd, &ordered_sd_list, list)
 			__msm_sd_close_subdevs(msm_sd, &sd_close);
 
-#ifndef CONFIG_ARCH_MSM8939
+#if !defined(CONFIG_ARCH_MSM8939) && !defined(CONFIG_ARCH_MSM8929)
 	/* remove msm_v4l2_pm_qos_request */
 	msm_pm_qos_remove_request();
 #endif
@@ -914,7 +914,7 @@ static int msm_open(struct file *filep)
 	msm_eventq = filep->private_data;
 	spin_unlock_irqrestore(&msm_eventq_lock, flags);
 
-#ifndef CONFIG_ARCH_MSM8939
+#if !defined(CONFIG_ARCH_MSM8939) && !defined(CONFIG_ARCH_MSM8929)
 	/* register msm_v4l2_pm_qos_request */
 	msm_pm_qos_add_request();
 #endif

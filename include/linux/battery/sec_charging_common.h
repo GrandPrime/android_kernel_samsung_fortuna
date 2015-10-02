@@ -440,8 +440,12 @@ struct sec_battery_platform_data {
 	bool use_LED;				/* use charging LED */
 
 	bool event_check;
+	unsigned int chg_high_temp;
+
+
 	/* flag for skipping the swelling mode */
 	bool swelling_mode_skip_in_high_temp;
+
 	/* sustaining event after deactivated (second) */
 	unsigned int event_waiting_time;
 
@@ -607,6 +611,8 @@ struct sec_battery_platform_data {
 	/* float voltage (mV) */
 	int chg_float_voltage;
 	sec_charger_functions_t chg_functions_setting;
+	int siop_level;
+	bool siop_activated;
 
 	/* ADC setting */
 	unsigned int adc_check_count;

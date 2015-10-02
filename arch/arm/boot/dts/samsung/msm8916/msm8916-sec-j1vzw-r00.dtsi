@@ -16,7 +16,7 @@
 #include "msm8916-camera-sensor-cdp-j1vzw.dtsi"
 #include "msm8916-sec-j1ltevzw-battery-r00.dtsi"
 #include "../../../../../../drivers/video/msm/mdss/samsung/S6D77A1A01_BV043WVMB1/dsi_panel_s6d77a1a01_wvga_video.dtsi"
-#include "../../../../../../drivers/video/msm/mdss/samsung/S6D77A1A01_BV043WVM/dsi_panel_s6d77a1a01_bv043wvm_wvga_video.dtsi"
+#include "../../../../../../drivers/video/msm/mdss/samsung/S6D77A1A01_BV043WVMBM/dsi_panel_s6d77a1a01_bv043wvm_wvga_video.dtsi"
 / {
 	aliases {
 		serial0 = &blsp1_uart2;
@@ -46,6 +46,10 @@
 			gpios = <&msm_gpio 60 0>;
 			status = "ok";
 		};
+	};
+
+	input_booster {
+		status = "ok";
 	};
 
 	i2c@78b9000 { /* BLSP1 QUP5 */
@@ -239,8 +243,9 @@
         svc_leds@30{
                 compatible = "leds,ktd2026";
                 reg = <0x30>;
-		ktd2026,default_current = <0x30>;	/* default only rossa spr&tfn&vzw model:0x30, other models:0x10 */
-		ktd2026,lowpower_current = <0x02>;
+		ktd2026,default_current = <0x08>;	/* default 0x08 */
+		ktd2026,offset_current = <0x200008>;    /* R_offset 0x20,G_offset 0x00,B_offset 0x08, default+offset<0xff */
+		ktd2026,lowpower_current = <0x02>;     /* lowpower 0x02 */
         };
 	};
 
@@ -488,12 +493,7 @@
                  qcom,num-grp-pins = <2>;
                  qcom,pins = <&gp 25>, <&gp 102>;
 };
-&dsi_boe_tft_wvga_video {
-	samsung,panel-extra-power-gpio1 = <&msm_gpio 102 0>;
-};
-&dsi_boe_tft_wvga_video_verB{
-	samsung,panel-extra-power-gpio1 = <&msm_gpio 102 0>;
-};
+
 &mdss_dsi0 {
 	//qcom,dsi-pref-prim-pan = <&dsi_boe_tft_wvga_video>;
 	pinctrl-names = "mdss_default", "mdss_sleep";

@@ -89,6 +89,7 @@
 #include <linux/sched.h>
 #include <linux/fs_struct.h>
 #include <linux/namei.h>
+#include <linux/vmalloc.h>
 #include <asm/current.h>
 #include <asm/unaligned.h>
 
@@ -1968,7 +1969,10 @@ static void exfat_put_super(struct super_block *sb)
 	}
 
 	sb->s_fs_info = NULL;
-	kfree(sbi);
+	if (!sbi->use_vmalloc)
+		kfree(sbi);
+	else
+		vfree(sbi);
 
 	exfat_mnt_msg(sb, 0, err, "unmounted successfully!");
 }
@@ -2332,8 +2336,12 @@ static int exfat_fill_super(struct super_block *sb, void *data, int silent)
 
 	sbi = kzalloc(sizeof(struct exfat_sb_info), GFP_KERNEL);
 	if (!sbi) {
-		exfat_mnt_msg(sb, 1, 0, "failed to mount! (ENOMEM)");
-		return -ENOMEM;
+		sbi = vzalloc(sizeof(struct exfat_sb_info));
+		if (!sbi) {
+			exfat_mnt_msg(sb, 1, 0, "failed to mount! (ENOMEM)");
+			return -ENOMEM;
+		}
+		sbi->use_vmalloc = 1;
 	}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0)
 	mutex_init(&sbi->s_lock);
@@ -2419,7 +2427,10 @@ out_fail:
 	if (sbi->options.iocharset != exfat_default_iocharset)
 		kfree(sbi->options.iocharset);
 	sb->s_fs_info = NULL;
-	kfree(sbi);
+	if (!sbi->use_vmalloc)
+		kfree(sbi);
+	else
+		vfree(sbi);
 	return error;
 }
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)

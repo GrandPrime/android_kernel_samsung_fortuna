@@ -559,7 +559,7 @@ static int camera_v4l2_open(struct file *filep)
 	if (!atomic_read(&pvdev->opened)) {
 		pm_stay_awake(&pvdev->vdev->dev);
 
-#ifndef CONFIG_ARCH_MSM8939
+#if !defined(CONFIG_ARCH_MSM8939) && !defined(CONFIG_ARCH_MSM8929)
 		/* Disable power collapse latency */
 		msm_pm_qos_update_request(CAMERA_DISABLE_PC_LATENCY);
 #endif
@@ -674,7 +674,7 @@ static int camera_v4l2_close(struct file *filep)
 		 * and application crashes */
 		msm_destroy_session(pvdev->vdev->num);
 
-#ifndef CONFIG_ARCH_MSM8939
+#if !defined(CONFIG_ARCH_MSM8939) && !defined(CONFIG_ARCH_MSM8929)
 		/* Enable power collapse latency */
 		msm_pm_qos_update_request(CAMERA_ENABLE_PC_LATENCY);
 #endif

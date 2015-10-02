@@ -655,7 +655,6 @@ power_attr(cpufreq_max_limit);
 power_attr(cpufreq_min_limit);
 
 struct cpufreq_limit_handle *cpufreq_min_touch;
-struct cpufreq_limit_handle *cpufreq_min_finger;
 
 
 int set_freq_limit(unsigned long id, unsigned int freq)
@@ -669,28 +668,13 @@ int set_freq_limit(unsigned long id, unsigned int freq)
 		cpufreq_min_touch = NULL;
 	}
 
-	if (cpufreq_min_finger) {
-		cpufreq_limit_put(cpufreq_min_finger);
-		cpufreq_min_finger = NULL;
-	}
-
-	pr_debug("%s: id=%d freq=%d\n", __func__, (int)id, freq);
+	pr_err("%s: id=%d freq=%d\n", __func__, (int)id, freq);
 
 	/* min lock */
 	if (id & DVFS_TOUCH_ID) {
 		if (freq != -1) {
 			cpufreq_min_touch = cpufreq_limit_min_freq(freq, "touch min");
 			if (IS_ERR(cpufreq_min_touch)) {
-				pr_err("%s: fail to get the handle\n", __func__);
-				goto out;
-			}
-		}
-	}
-	
-	if (id & DVFS_FINGER_ID) {
-		if (freq != -1) {
-			cpufreq_min_finger = cpufreq_limit_min_freq(freq, "finger min");
-			if (IS_ERR(cpufreq_min_finger)) {
 				pr_err("%s: fail to get the handle\n", __func__);
 				goto out;
 			}

@@ -667,6 +667,7 @@ int pil_boot(struct pil_desc *desc)
 #ifdef CONFIG_SEC_PERIPHERAL_SECURE_CHK
 	static int load_count_fwd;
 #endif
+
 	/* Reinitialize for new image */
 	pil_release_mmap(desc);
 

@@ -66,7 +66,8 @@
 #include <linux/pid_namespace.h>
 
 #include "audit.h"
-#ifdef CONFIG_PROC_AVC
+
+#ifdef CONFIG_PROC_AVC 
 #include <linux/proc_avc.h>
 #endif
 
@@ -188,6 +189,7 @@ void audit_panic(const char *message)
 	case AUDIT_FAIL_SILENT:
 		break;
 	case AUDIT_FAIL_PRINTK:
+		if (printk_ratelimit())
 			printk(KERN_ERR "audit: %s\n", message);
 		break;
 	case AUDIT_FAIL_PANIC:
@@ -258,6 +260,7 @@ void audit_log_lost(const char *message)
 	}
 
 	if (print) {
+		if (printk_ratelimit())
 			printk(KERN_WARNING
 				"audit: audit_lost=%d audit_rate_limit=%d "
 				"audit_backlog_limit=%d\n",
@@ -400,22 +403,18 @@ static void kauditd_send_skb(struct sk_buff *skb)
 		audit_pid = 0;
 		/* we might get lucky and get this in the next auditd */
 		audit_hold_skb(skb);
+	} else{
 #ifdef CONFIG_PROC_AVC
-	} else {
 		struct nlmsghdr *nlh = nlmsg_hdr(skb);
 		char *data = nlmsg_data(nlh);
 	
 		if (nlh->nlmsg_type != AUDIT_EOE && nlh->nlmsg_type != AUDIT_NETFILTER_CFG) {
 			sec_avc_log("%s\n", data);
 		}
-#else
-	} else
 #endif
 		/* drop the extra reference if sent ok */
 		consume_skb(skb);
-#ifdef CONFIG_PROC_AVC
-}
-#endif
+	}
 }
 
 /*
@@ -1143,7 +1142,7 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 				continue;
 			}
 		}
-		if (audit_rate_check())
+		if (audit_rate_check() && printk_ratelimit())
 			printk(KERN_WARNING
 			       "audit: audit_backlog=%d > "
 			       "audit_backlog_limit=%d\n",

@@ -1,99 +1,37 @@
 #!/bin/bash
 # MSM8916 KK kernel build script v0.5
 
-SELINUX_DEFCONFIG=selinux_defconfig
-SELINUX_LOG_DEFCONFIG=selinux_log_defconfig
-
 BUILD_COMMAND=$1
-if [ "$BUILD_COMMAND" == "a3u_eur" ]; then
-	PRODUCT_NAME=a3ulte;
-	SIGN_MODEL=SM-A300FU_EUR_XX_ROOT0;
-elif [ "$BUILD_COMMAND" == "a5u_eur" ]; then
-	PRODUCT_NAME=a5ulte;
-	SIGN_MODEL=SM-A500FU_EUR_XX_ROOT0;
-elif [ "$BUILD_COMMAND" == "e5_eur" ]; then
-	PRODUCT_NAME=e5lte;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "e53g_eur" ]; then
-	PRODUCT_NAME=e53g;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "e7_eur" ]; then
-	PRODUCT_NAME=e7lte;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "e7_chn_open" ]; then
-	PRODUCT_NAME=e7ltezm;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "e7_ctc" ]; then
-	PRODUCT_NAME=e7ltectc;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "e73g_sea" ]; then
-	PRODUCT_NAME=e73gdx;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "gt58lte_eur" ]; then
-	PRODUCT_NAME=gt58lte;
-	SIGN_MODEL=SM-T355_EUR_XX_ROOT0;
-elif [ "$BUILD_COMMAND" == "gt58lte_aus" ]; then
-	PRODUCT_NAME=gt58ltedo;
-	SIGN_MODEL=SM-T355Y_SEA_XSA_ROOT0;
-elif [ "$BUILD_COMMAND" == "gt58lte_vzw" ]; then
-	PRODUCT_NAME=gt58ltevzw;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "gt58lte_tmo" ]; then
-	PRODUCT_NAME=gt58ltetmo;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "gt58wifi_eur" ]; then
-	PRODUCT_NAME=gt58wifi;
-	SIGN_MODEL=SM-T350_EUR_XX_ROOT0;
-elif [ "$BUILD_COMMAND" == "gt510lte_eur" ]; then
-	PRODUCT_NAME=gt510lte;
-	SIGN_MODEL=SM-T555_EUR_XX_ROOT0;
-elif [ "$BUILD_COMMAND" == "gt510lte_vzw" ]; then
-	PRODUCT_NAME=gt510ltevzw;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "gt510lte_chnopen" ]; then
-	PRODUCT_NAME=gt510ltechnopen;
-	SIGN_MODEL=SM-T555C_CHN_CHN_ROOT0
-elif [ "$BUILD_COMMAND" == "gt510wifi_eur" ]; then
-	PRODUCT_NAME=gt510wifi;
-	SIGN_MODEL=SM-T550_EUR_XX_ROOT0;
-elif [ "$BUILD_COMMAND" == "gt5note8lte_eur" ]; then
-	PRODUCT_NAME=gt5note8lte;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "gt5note8wifi_eur" ]; then
-	PRODUCT_NAME=gt5note8wifi;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "gt5note10lte_eur" ]; then
-	PRODUCT_NAME=gt5note10lte;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "gt5note10lte_chn" ]; then
-	PRODUCT_NAME=gt5note10ltechn;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "gt5note103g_eur" ]; then
-	PRODUCT_NAME=gt5note103g;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "gt5note10wifi_eur" ]; then
-	PRODUCT_NAME=gt5note10wifi;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "signumlte_eur" ]; then
-	PRODUCT_NAME=signumltexx;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "fortuna_tfn" ]; then
-	PRODUCT_NAME=gprimeltetfnvzw;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "fortuna_usc" ]; then
-	PRODUCT_NAME=gprimelteusc;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "fortuna_tmo" ]; then
-	PRODUCT_NAME=gprimeltetmo;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "fortuna_spr" ]; then
-	PRODUCT_NAME=gprimeltespr;
-	SIGN_MODEL=
-elif [ "$BUILD_COMMAND" == "rossa_tmo" ]; then
-	PRODUCT_NAME=rossaltetmo;
-	SIGN_MODEL=
+if [ "$BUILD_COMMAND" == "rossa_eur" ]; then
+        PRODUCT_NAME=rossalte;
+	SIGN_MODEL=SM-G360F_EUR_XX_ROOT0 
+elif [ "$BUILD_COMMAND" == "a3_chnopen" ]; then
+        PRODUCT_NAME=a3ltechn;
+        SIGN_MODEL=SM-A3000_CHN_CHC_ROOT0
+elif [ "$BUILD_COMMAND" == "a3_chntw" ]; then
+        PRODUCT_NAME=a3ltezt;
+	 SIGN_MODEL=
+elif [ "$BUILD_COMMAND" == "a3_chnhk" ]; then
+        PRODUCT_NAME=a3ltezh;
+	 SIGN_MODEL=
+elif [ "$BUILD_COMMAND" == "a3_chnctc" ]; then
+        PRODUCT_NAME=a3ltectc;
+	 SIGN_MODEL=
+elif [ "$BUILD_COMMAND" == "a3_eur" ]; then
+	PRODUCT_NAME=a3ltexx;
+	SIGN_MODEL=SM-A300F_CIS_SER_ROOT0
 elif [ "$BUILD_COMMAND" == "j1_vzw" ]; then
-	PRODUCT_NAME=j1qltevzw;
+        PRODUCT_NAME=j1qltevzw;
+	SIGN_MODEL=SM-J100V_NA_VZW_ROOT0
+elif [ "$BUILD_COMMAND" == "novel_kx" ]; then
+        PRODUCT_NAME=novelltekx;
+elif [ "$BUILD_COMMAND" == "j5lte_chncmcc" ]; then
+        PRODUCT_NAME=j5lte_chncmcc;
+elif [ "$BUILD_COMMAND" == "j5lte_chnctc" ]; then
+        PRODUCT_NAME=j5lte_chnctc;
+	SIGN_MODEL=
+elif [ "$BUILD_COMMAND" == "j5lte_kor" ]; then
+        PRODUCT_NAME=j5ltekx;
 	SIGN_MODEL=
 else
 #default product
@@ -119,6 +57,8 @@ export PATH=$(pwd)/bin:$PATH
 
 KERNEL_DEFCONFIG=msm8916_sec_defconfig
 DEBUG_DEFCONFIG=msm8916_sec_eng_defconfig
+SELINUX_DEFCONFIG=selinux_defconfig
+SELINUX_LOG_DEFCONFIG=selinux_log_defconfig
 DMVERITY_DEFCONFIG=dmverity_defconfig
 
 while getopts "w:t:" flag; do
@@ -144,7 +84,7 @@ BUILD_COMMAND=$1
 SECURE_OPTION=
 SEANDROID_OPTION=
 if [ "$2" == "-B" ]; then
-	SECURE_OPTION=$2
+SECURE_OPTION=$2
 elif [ "$2" == "-E" ]; then
 	SEANDROID_OPTION=$2
 else
@@ -164,8 +104,6 @@ TEMP=${BUILD_COMMAND#*_}
 REGION=${TEMP%%_*}
 CARRIER=${TEMP##*_}
 
-VARIANT=k${CARRIER}
-PROJECT_NAME=${VARIANT}
 VARIANT_DEFCONFIG=msm8916_sec_${MODEL}_${CARRIER}_defconfig
 
 CERTIFICATION=NONCERT
@@ -366,36 +304,19 @@ SECFUNC_PRINT_HELP()
 	echo "Help"
 	echo "$0 \$1 \$2 \$3"
 	echo "  \$1 : "
-	echo "	for A3ULTE_EUR_OPEN use a3u_eur"
-	echo "	for A5ULTE_EUR_OPEN use a5u_eur"
-	echo "	for E5LTE_EUR_OPEN use e5_eur"
-	echo "	for E53G_EUR_OPEN use e53g_eur"
-	echo "	for E7LTE_EUR_OPEN use e7_eur"
-	echo "	for E7LTE_CHNOPEN use e7_chn_open"
-	echo "	for E7LTE_CTC use e7_ctc"
-	echo "	for E73G_SEA_OPEN use e73g_sea"
-	echo "	for GT58LTE_EUR_OPEN use gt58lte_eur"
-	echo "	for GT58LTE_SEA_XSA use gt58lte_aus"
-	echo "	for GT58LTE_USA_VZW use gt58lte_vzw"
-	echo "	for GT58LTE_USA_TMO use gt58lte_tmo"
-	echo "	for GT58WIFI_EUR_OPEN use gt58wifi_eur"
-	echo "	for GT510LTE_EUR_OPEN use gt510lte_eur"
-	echo "	for GT510LTE_USA_VZW use gt510lte_vzw"
-	echo "	for GT510LTE_CHN_OPEN use gt510lte_chnopen"
-	echo "	for GT510WIFI_EUR_OPEN use gt510wifi_eur"
-	echo "	for GT5NOTE8LTE_EUR_OPEN use gt5note8lte_eur"
-	echo "	for GT5NOTE8WIFI_EUR_OPEN use gt5note8wifi_eur"
-	echo "	for GT5NOTE10LTE_EUR_OPEN use gt5note10lte_eur"
-	echo "	for GT5NOTE10LTE_CHN_OPEN use gt5note10lte_chn"
-	echo "	for GT5NOTE103G_EUR_OPEN use gt5note103g_eur"
-	echo "	for GT5NOTE103G_EUR_OPEN use gt5note10wifi_eur"
-	echo "	for SIGNUMLTE_EUR_OPEN use signumlte_eur"
-	echo "	for FORTUNA_USA_TFN use fortuna_tfn"
-	echo "	for FORTUNA_USA_USC use fortuna_usc"
-	echo "	for FORTUNA_USA_TMO use fortuna_tmo"
-	echo "	for FORTUNA_USA_SPR use fortuna_spr"
-	echo "	for ROSSA_USA_TMO use rossa_tmo"
-        echo "	for J1QLTE_USA_VZW use j1_vzw"
+	echo "	for ROSSALTE_EUR_OPEN use rossa_eur"
+	echo "	for ROSSALTE_USA_TMO use rossa_tmo"
+	echo "	for A3LTE_EUR_OPEN use a3_eur"
+	echo "	for A3LTE_CHN_OPEN use a3_chnopen"
+	echo "	for A3LTE_CHN_HK use a3_chnhk"
+	echo "	for A3LTE_CHN_TW use a3_chntw"
+	echo "	for A3LTE_CHN_CTC use a3_chnctc"
+	echo "	for J1_USA_VZW use j1_vzw"
+	echo "	for J5LTE_EUR use j5lte_eur"
+	echo "	for J53G_EUR use j53g_eur"
+	echo "	for J5LTE_CHNCMCC use j5lte_chncmcc"
+	echo "	for J5LTE_KOR_OPEN use j5lte_kor"
+	echo "	for NOVELLTE_KOR_OPEN use novel_kx"
 	echo "  \$2 : "
 	echo "	-B or Nothing  (-B : Secure Binary)"
 	echo "  \$3 : "

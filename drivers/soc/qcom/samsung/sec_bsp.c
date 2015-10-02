@@ -51,6 +51,12 @@ enum boot_events_type {
 	PLATFORM_ENABLE_SCREEN,
 	PLATFORM_VOICE_SVC,
 	PLATFORM_DATA_SVC,
+	RIL_UNSOL_RIL_CONNECTED,
+	RIL_SETRADIOPOWER_ON,
+	RIL_SETUICCSUBSCRIPTION,
+    RIL_SIM_RECORDSLOADED,
+    RIL_RUIM_RECORDSLOADED,
+	RIL_SETUPDATACALL,
 };
 
 static struct boot_event boot_events[] = {
@@ -62,14 +68,20 @@ static struct boot_event boot_events[] = {
 	{PLATFORM_START_PRELOAD_CLASSES,"!@Boot: beginofpreloadClasses()",0},
 	{PLATFORM_END_PRELOAD_RESOURCES,"!@Boot: End of preloadResources()",0},
 	{PLATFORM_END_PRELOAD_CLASSES,"!@Boot: EndofpreloadClasses()",0},
-	{PLATFORM_START_INIT_AND_LOOP,"!@Boot: Entered the Android system server!",0},
+	{PLATFORM_START_INIT_AND_LOOP, "!@Boot: Entered the Android system server!", 0},
 	{PLATFORM_START_PACKAGEMANAGERSERVICE,"!@Boot: Start PackageManagerService",0},
 	{PLATFORM_END_PACKAGEMANAGERSERVICE,"!@Boot: End PackageManagerService",0},
-	{PLATFORM_END_INIT_AND_LOOP,"!@Boot: Loop forever",0},
+	{PLATFORM_END_INIT_AND_LOOP, "!@Boot: Loop forever", 0},
 	{PLATFORM_BOOT_COMPLETE,"!@Boot: bootcomplete",0},
 	{PLATFORM_ENABLE_SCREEN,"!@Boot: Enabling Screen!",0},
 	{PLATFORM_VOICE_SVC,"!@Boot: Voice SVC is acquired",0},
 	{PLATFORM_DATA_SVC,"!@Boot: Data SVC is acquired",0},
+	{RIL_UNSOL_RIL_CONNECTED,"!@Boot_SVC : RIL_UNSOL_RIL_CONNECTED",0},
+	{RIL_SETRADIOPOWER_ON,"!@Boot_SVC : setRadioPower on",0},
+	{RIL_SETUICCSUBSCRIPTION,"!@Boot_SVC : setUiccSubscription",0},
+    {RIL_SIM_RECORDSLOADED,"!@Boot_SVC : SIM onAllRecordsLoaded",0},
+    {RIL_RUIM_RECORDSLOADED,"!@Boot_SVC : RUIM onAllRecordsLoaded",0},
+	{RIL_SETUPDATACALL,"!@Boot_SVC : setupDataCall",0},
 	{0,NULL,0},
 };
 
@@ -119,7 +131,8 @@ void sec_boot_stat_add(const char * c)
 		if(strcmp(c, boot_events[i].string) == 0)
 		{
 			if (boot_events[i].time == 0)
-				boot_events[i].time = get_boot_stat_time(); 
+				boot_events[i].time = get_boot_stat_time();
+
 #ifdef CONFIG_SEC_GPIO_DVS
 			if (boot_events[i].type==PLATFORM_BOOT_COMPLETE)
 				gpio_dvs_check_initgpio();

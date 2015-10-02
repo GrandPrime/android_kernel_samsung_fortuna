@@ -1278,7 +1278,7 @@ static int __init sec_logger_init(void)
 #endif
         return 0;
 }
-arch_initcall_sync(sec_logger_init);
+late_initcall(sec_logger_init);
 #endif
 
 /* core reg dump function*/
@@ -1603,14 +1603,14 @@ int sec_debug_dump_stack(void)
 }
 EXPORT_SYMBOL(sec_debug_dump_stack);
 
-#if defined(CONFIG_TOUCHSCREEN_MMS252) || defined(CONFIG_TOUCHSCREEN_MMS300)// debug for tsp ghost touch
+#ifdef CONFIG_TOUCHSCREEN_MMS252// debug for tsp ghost touch
 extern void dump_tsp_log(void);
 #endif
 
 void sec_debug_check_crash_key(unsigned int code, int value)
 {
 	static enum { NONE, STEP1, STEP2, STEP3} state = NONE;
-#if defined(CONFIG_TOUCHSCREEN_MMS252) || defined(CONFIG_TOUCHSCREEN_MMS300)
+#ifdef CONFIG_TOUCHSCREEN_MMS252
         static enum { NO, T1, T2, T3} state_tsp = NO;
 #endif
 
@@ -1623,10 +1623,7 @@ void sec_debug_check_crash_key(unsigned int code, int value)
 			sec_debug_set_upload_cause(UPLOAD_CAUSE_INIT);
 	}
 
-	if (!enable)
-		return;
-	
-#if defined(CONFIG_TOUCHSCREEN_MMS252) || defined(CONFIG_TOUCHSCREEN_MMS300)
+#ifdef CONFIG_TOUCHSCREEN_MMS252
 	if(code == KEY_VOLUMEUP && !value){
 		 state_tsp = NO;
 	} else {
@@ -1660,6 +1657,9 @@ void sec_debug_check_crash_key(unsigned int code, int value)
 	}
 
 #endif
+
+	if (!enable)
+		return;
 
 	switch (state) {
 	case NONE:
@@ -2068,8 +2068,6 @@ int sec_debug_subsys_init(void)
 #endif
 	}
 
-	secdbg_krait->magic = SEC_DEBUG_SUBSYS_MAGIC1;
-
 	/* fill magic nubmer last to ensure data integrity when the magic
 	 * numbers are written
 	 */
@@ -2079,7 +2077,7 @@ int sec_debug_subsys_init(void)
 	secdbg_subsys->magic[3] = SEC_DEBUG_SUBSYS_MAGIC3;
 	return 0;
 }
-arch_initcall_sync(sec_debug_subsys_init);
+late_initcall(sec_debug_subsys_init);
 #endif
 
 static int parse_address(char* str_address, unsigned *paddress, const char *caller_name)
@@ -2860,10 +2858,7 @@ void sec_param_restart_reason(const char *cmd)
 		} else if (!strncmp(cmd, "nvrecovery", 10)) {
 				param_restart_reason = 0x77665515;
 		} else if (!strncmp(cmd, "sud", 3)) {
-				if (strlen(cmd) == 5)
-					param_restart_reason = (0xabcf0000 | (((cmd[3] - '0') * 10) + (cmd[4] - '0')));
-				else
-					param_restart_reason = (0xabcf0000 | (cmd[3] - '0'));
+				param_restart_reason = (0xabcf0000 | (cmd[3] - '0'));
 		} else if (!strncmp(cmd, "debug", 5)
 						&& !kstrtoul(cmd + 5, 0, &value)) {
 				param_restart_reason =(0xabcd0000 | value);
@@ -2880,6 +2875,10 @@ void sec_param_restart_reason(const char *cmd)
 		} else if (strlen(cmd) == 0) {
 		    printk(KERN_NOTICE "%s : value of cmd is NULL.\n", __func__);
 		        param_restart_reason = 0x12345678;
+#ifdef CONFIG_SEC_PERIPHERAL_SECURE_CHK
+		} else if (!strncmp(cmd, "peripheral_hw_reset", 19)) {
+			param_restart_reason = 0x77665507;
+#endif
 		} else {
 			param_restart_reason = 0x77665501;
 		}

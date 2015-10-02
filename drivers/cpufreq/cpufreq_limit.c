@@ -119,11 +119,20 @@ struct cpufreq_limit_hmp hmp_param = {
 	.little_cpu_end			= 7,
 	.big_cpu_start			= 0,
 	.big_cpu_end			= 3,
+#if defined(CONFIG_ARCH_MSM8939)
 	.big_min_freq			= 1036800,
 	.big_max_freq			= 1497600,
 	.little_min_freq		= 200000, // 400000 Khz
 	.little_max_freq		= 556800, // 1113600 Khz
 	.little_min_lock		= 400000, // 800000 Khz
+#else
+	.big_min_freq			= 960000,
+	.big_max_freq			= 1363200,
+	.little_min_freq		= 249600, // 499200 Khz
+	//.little_max_freq		= 499200, // 998400 Khz
+	.little_max_freq		= 556800, // 1113600 Khz
+	.little_min_lock		= 400000, // 800000 Khz
+#endif
 	.little_divider			= 2,
 	.hmp_boost_type			= 1,
 	.hmp_boost_active		= 0,
@@ -137,7 +146,6 @@ ssize_t cpufreq_limit_get_table(char *buf)
 {
 	ssize_t len = 0;
 	int i, count = 0;
-	unsigned int freq;
 
 	struct cpufreq_frequency_table *table;
 
@@ -152,6 +160,7 @@ ssize_t cpufreq_limit_get_table(char *buf)
 		count = i;
 
 	for (i = count; i >= 0; i--) {
+		unsigned int freq;
 		freq = table[i].frequency;
 
 		if (freq == CPUFREQ_ENTRY_INVALID || freq < hmp_param.big_min_freq)
@@ -160,9 +169,12 @@ ssize_t cpufreq_limit_get_table(char *buf)
 		len += sprintf(buf + len, "%u ", freq);
 	}
 
-#ifdef CONFIG_ARCH_MSM8939
+#if defined(CONFIG_ARCH_MSM8939)
 	// for SSRM early access
 	len += sprintf(buf + len, "556800 499200 400000 266666 249600 200000 124800 100000\n");
+#elif defined(CONFIG_ARCH_MSM8929)
+	// for SSRM early access
+	len += sprintf(buf + len, "556800 499200 400000 249600 124800 100000\n");
 #else
 	/* Little cluster table */
 	table = cpufreq_frequency_get_table(hmp_param.little_cpu_start);
@@ -175,6 +187,7 @@ ssize_t cpufreq_limit_get_table(char *buf)
 		count = i;
 
 	for (i = count; i >= 0; i--) {
+		unsigned int freq;
 		freq = table[i].frequency / hmp_param.little_divider;
 
 		if (freq == CPUFREQ_ENTRY_INVALID)
@@ -233,7 +246,6 @@ static int cpufreq_limit_hmp_boost(int enable)
 static int cpufreq_limit_adjust_freq(struct cpufreq_policy *policy,
 		unsigned long *min, unsigned long *max)
 {
-	unsigned int hmp_boost_active = 0;
 
 	pr_debug("%s+: cpu=%d, min=%ld, max=%ld\n", __func__, policy->cpu, *min, *max);
 
@@ -253,6 +265,7 @@ static int cpufreq_limit_adjust_freq(struct cpufreq_policy *policy,
 		}
 	}
 	else { /* BIG */
+		unsigned int hmp_boost_active = 0;
 		if (*min >= hmp_param.big_min_freq) { /* Big clock */
 			hmp_boost_active = 1;
 		}

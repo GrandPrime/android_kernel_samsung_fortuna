@@ -730,9 +730,11 @@ config RESTART_REASON_SEC_PARAM
 	default n
 	help
 	  Param partition can retain the values across reboot, hence this comes in handy backup, when restart reason saved in IMEM is lost.
+
 config CX_VOTE_TURBO
         bool "Set the Cx as Turbo mode during warmboot exit "
         default n
         help
 	   Say Y here if you want to set the Cx as Turbo mode
+
 endmenu

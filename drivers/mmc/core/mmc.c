@@ -81,9 +81,7 @@ static const struct mmc_fixup mmc_fixups[] = {
 		add_quirk_mmc, MMC_QUIRK_CACHE_DISABLE),
 	MMC_FIXUP("MMC16G", CID_MANFID_KINGSTON, CID_OEMID_ANY, add_quirk_mmc,
 		  MMC_QUIRK_CACHE_DISABLE),
-        /* Disable HPI feature for micron card */
-        MMC_FIXUP(CID_NAME_ANY, CID_MANFID_NUMONYX_MICRON, CID_OEMID_ANY,
-                add_quirk_mmc, MMC_QUIRK_BROKEN_HPI),
+
 	END_FIXUP
 };
 
@@ -537,12 +535,12 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	}
 
 	if (card->ext_csd.rev >= 5) {
-		/* enable packed configuration for Toshiba eMMC */
-		if (card->cid.manfid == 0x11) {
-			pr_info("Enabling Packed WR for the Toshiba eMMC\n");
-			card->host->caps2 |= MMC_CAP2_PACKED_WR;
-			card->host->caps2 |= MMC_CAP2_PACKED_WR_CONTROL;
-		}
+		/* enable packed configuration for Toshiba eMMC */ 
+ 		if (card->cid.manfid == 0x11) { 
+ 			pr_info("Enabling Packed WR for the Toshiba eMMC\n"); 
+ 			card->host->caps2 |= MMC_CAP2_PACKED_WR; 
+ 			card->host->caps2 |= MMC_CAP2_PACKED_WR_CONTROL; 
+ 		} 
 
 		/* check whether the eMMC card supports HPI */
 		if ((ext_csd[EXT_CSD_HPI_FEATURES] & 0x1) &&
@@ -642,20 +640,19 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	} else {
 		card->ext_csd.data_sector_size = 512;
 	}
-
 	/* eMMC v5.0 or later */
 	if (card->ext_csd.rev >= 7) {
 		card->ext_csd.smart_info = mmc_merge_ext_csd(ext_csd, false, 8,
-				EXT_CSD_DEVICE_LIFE_TIME_EST_TYPE_B,
-				EXT_CSD_DEVICE_LIFE_TIME_EST_TYPE_A,
-				EXT_CSD_PRE_EOL_INFO,
-				EXT_CSD_OPTIMAL_TRIM_UNIT_SIZE,
-				EXT_CSD_DEVICE_VERSION + 1,
-				EXT_CSD_DEVICE_VERSION,
-				EXT_CSD_HC_ERASE_GRP_SIZE,
-				EXT_CSD_HC_WP_GRP_SIZE);
+			EXT_CSD_DEVICE_LIFE_TIME_EST_TYPE_B,
+			EXT_CSD_DEVICE_LIFE_TIME_EST_TYPE_A,
+			EXT_CSD_PRE_EOL_INFO,
+			EXT_CSD_OPTIMAL_TRIM_UNIT_SIZE,
+			EXT_CSD_DEVICE_VERSION + 1,
+			EXT_CSD_DEVICE_VERSION,
+			EXT_CSD_HC_ERASE_GRP_SIZE,
+			EXT_CSD_HC_WP_GRP_SIZE);
 		card->ext_csd.fwdate = mmc_merge_ext_csd(ext_csd, true, 8,
-				EXT_CSD_FIRMWARE_VERSION);
+			EXT_CSD_FIRMWARE_VERSION);
 	}
 
 out:
@@ -755,15 +752,15 @@ MMC_DEV_ATTR(bkops_enable, "%d\n", card->ext_csd.bkops_en);
 MMC_DEV_ATTR(caps, "0x%08x\n", (unsigned int)(card->host->caps));
 MMC_DEV_ATTR(caps2, "0x%08x\n", card->host->caps2);
 MMC_DEV_ATTR(erase_type, "MMC_CAP_ERASE %s, type %s, SECURE %s, Sanitize %s\n",
-		card->host->caps & MMC_CAP_ERASE ? "enabled" : "disabled",
-		mmc_can_discard(card) ? "DISCARD" :
-		(mmc_can_trim(card) ? "TRIM" : "NORMAL"),
-		(!(card->quirks & MMC_QUIRK_SEC_ERASE_TRIM_BROKEN) && 
-		 mmc_can_secure_erase_trim(card)) ? "supportable" : "disabled",
-		mmc_can_sanitize(card) ? "enabled" : "disabled");
+	card->host->caps & MMC_CAP_ERASE ? "enabled" : "disabled",
+	mmc_can_discard(card) ? "DISCARD" :
+	(mmc_can_trim(card) ? "TRIM" : "NORMAL"),
+	(!(card->quirks & MMC_QUIRK_SEC_ERASE_TRIM_BROKEN) && 
+	 mmc_can_secure_erase_trim(card)) ? "supportable" : "disabled",
+	mmc_can_sanitize(card) ? "enabled" : "disabled");
 MMC_DEV_ATTR(packed_cmd, "packed_cmd %s / %s\n",
-		card->host->caps2 & MMC_CAP2_PACKED_WR ? "WR enabled" : "WR disabled",
-		card->host->caps2 & MMC_CAP2_PACKED_RD ? "RD enabled" : "RD disabled");
+	card->host->caps2 & MMC_CAP2_PACKED_WR ? "WR enabled" : "WR disabled",
+	card->host->caps2 & MMC_CAP2_PACKED_RD ? "RD enabled" : "RD disabled");
 
 static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_cid.attr,
@@ -1801,7 +1798,6 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			mmc_bkops_enable(oldcard->host, oldcard->bkops_enable);
 		}
 	}
-
 
 	return 0;
 

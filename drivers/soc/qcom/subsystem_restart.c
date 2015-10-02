@@ -713,10 +713,10 @@ void subsystem_put(void *subsystem)
 	if (!--subsys->count) {
 #ifdef CONFIG_SEC_DEBUG
 		if (strncmp(subsys->desc->name, "modem", 5)) {
-		subsys_stop(subsys);
-		if (subsys->do_ramdump_on_put)
-			subsystem_ramdump(subsys, NULL);
-	}
+			subsys_stop(subsys);
+			if (subsys->do_ramdump_on_put)
+				subsystem_ramdump(subsys, NULL);
+		}
 		else {
 			pr_err("subsys: block modem put stop for stabilty\n");
 			subsys->count++;
@@ -845,8 +845,8 @@ static void device_restart_work_hdlr(struct work_struct *work)
 {
 #ifdef CONFIG_SEC_DEBUG
 	struct subsys_device *dev = container_of(to_delayed_work(work),
-						struct subsys_device,
-						device_restart_delayed_work);
+			struct subsys_device,
+			device_restart_delayed_work);
 #else
 	struct subsys_device *dev = container_of(work, struct subsys_device,
 							device_restart_work);
@@ -874,11 +874,11 @@ int subsystem_restart_dev(struct subsys_device *dev)
 #if 0 //def CONFIG_SEC_SSR_DEBUG_LEVEL_CHK /* Temporarily blocking until requested by cp or pl team */
 	if (!sec_debug_is_enabled_for_ssr())
 #else
-	if (!sec_debug_is_enabled())
+		if (!sec_debug_is_enabled())
 #endif
-		dev->restart_level = RESET_SUBSYS_COUPLED; //Why is it delete the RESET_SUBSYS_INDEPENDENT on MSM8974 ?
-	else
-		dev->restart_level = RESET_SOC;
+			dev->restart_level = RESET_SUBSYS_COUPLED; //Why is it delete the RESET_SUBSYS_INDEPENDENT on MSM8974 ?
+		else
+			dev->restart_level = RESET_SOC;
 #endif
 
 	/*
@@ -918,10 +918,10 @@ int subsystem_restart_dev(struct subsys_device *dev)
 		 */
 		if(silent_log_panic_handler())
 			schedule_delayed_work(&dev->device_restart_delayed_work,
-				msecs_to_jiffies(300));
+					msecs_to_jiffies(300));
 		else
 			schedule_delayed_work(&dev->device_restart_delayed_work,
-				0);
+					0);
 
 #else
 		schedule_work(&dev->device_restart_work);
@@ -1489,8 +1489,8 @@ struct subsys_device *subsys_register(struct subsys_desc *desc)
 	wakeup_source_init(&subsys->ssr_wlock, subsys->wlname);
 	INIT_WORK(&subsys->work, subsystem_restart_wq_func);
 #ifdef CONFIG_SEC_DEBUG
-	INIT_DELAYED_WORK(&subsys->device_restart_delayed_work,
-				device_restart_work_hdlr);
+		INIT_DELAYED_WORK(&subsys->device_restart_delayed_work,
+								device_restart_work_hdlr);
 #else
 	INIT_WORK(&subsys->device_restart_work, device_restart_work_hdlr);
 #endif

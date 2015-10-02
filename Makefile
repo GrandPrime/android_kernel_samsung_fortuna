@@ -194,7 +194,7 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 export KBUILD_BUILDHOST := $(SUBARCH)
 ARCH		?=arm
-CROSS_COMPILE	?=/opt/toolchains/arm-eabi-4.7/bin/arm-eabi-
+CROSS_COMPILE	?=/home/ab2/android/cm-12.0/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8/bin/arm-eabi-
 
 # Architecture as present in compile.h
 UTS_MACHINE 	:= $(ARCH)
@@ -698,14 +698,6 @@ endif
 KBUILD_CPPFLAGS += $(KCPPFLAGS)
 KBUILD_AFLAGS += $(KAFLAGS)
 KBUILD_CFLAGS += $(KCFLAGS)
-
-ifeq ($(CONFIG_SENSORS_FINGERPRINT), y)
-ifneq ($(CONFIG_SEC_FACTORY), true)
-ifneq ($(SEC_BUILD_CONF_USE_FINGERPRINT_TZ), false)
-	export KBUILD_FP_SENSOR_CFLAGS := -DENABLE_SENSORS_FPRINT_SECURE
-endif
-endif
-endif
 
 # Use --build-id when available.
 LDFLAGS_BUILD_ID = $(patsubst -Wl$(comma)%,%,\

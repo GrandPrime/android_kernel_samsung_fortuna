@@ -33,7 +33,7 @@
 #include <linux/qpnp/power-on.h>
 #endif
 #if defined(CONFIG_SEC_DEBUG)
-#include <linux/sec_debug.h>
+#include <mach/sec_debug.h>
 #endif
 #include <linux/pinctrl/consumer.h>
 #include <linux/syscore_ops.h>
@@ -350,6 +350,7 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 #ifdef CONFIG_SEC_DEBUG
 	sec_debug_check_crash_key(button->code, state);
 #endif
+
 	if (type == EV_ABS) {
 		if (state)
 			input_event(input, type, button->code, button->value);
@@ -701,7 +702,7 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 		button->wakeup = !!of_get_property(pp, "gpio-key,wakeup", NULL);
 
 		if (of_property_read_u32(pp, "debounce-interval",
-					&button->debounce_interval))
+					 &button->debounce_interval))
 			button->debounce_interval = 5;
 	}
 

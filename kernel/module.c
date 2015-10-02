@@ -2492,7 +2492,7 @@ static int lkmauth(Elf_Ehdr *hdr, int len, int cnt)
 	pr_warn("TIMA: lkmauth--launch the tzapp to check kernel module; module len is %d\n", len);
 
 	snprintf(app_name, MAX_APP_NAME_SIZE, "%s", "tima_lkm");
-    
+
 	if ( NULL == qhandle ) {
 		/* start the lkmauth tzapp only when it is not loaded. */
 		qsee_ret = qseecom_start_app(&qhandle, app_name, 1024);
@@ -2513,10 +2513,10 @@ static int lkmauth(Elf_Ehdr *hdr, int len, int cnt)
 	
 	/* Generate the request cmd to verify hash of ko. 
 	 * Note that we are reusing the same buffer for both request and response, 
-	 * and the buffer is allocated in qhandle. 
+	 * and the buffer is allocated in qhandle.
 	 */
 	kreq = (struct lkmauth_req_s *)qhandle->sbuf;
-	kreq->cmd_id = LKMAUTH_CMD_AUTH; 
+	kreq->cmd_id = LKMAUTH_CMD_AUTH;
 	pr_warn("TIMA: lkmauth -- hdr before kreq is : %x\n", (u32)hdr);
 	kreq->module_len = len;
 #ifdef CONFIG_LKMAUTH_SECONDWAY
@@ -2535,9 +2535,9 @@ static int lkmauth(Elf_Ehdr *hdr, int len, int cnt)
 	do {
 		spin_lock_irqsave(&lkm_va_to_pa_lock, flags);
 		__asm__	("mcr	p15, 0, %1, c7, c8, 0\n"
-		"isb\n"
-		"mrc 	p15, 0, %0, c7, c4, 0\n"
-		:"=r"(par):"r"(virt_addr));
+   		"isb\n"
+   		"mrc 	p15, 0, %0, c7, c4, 0\n"
+   		:"=r"(par):"r"(virt_addr));
 
 		spin_unlock_irqrestore(&lkm_va_to_pa_lock, flags);
 		if(par & 0x1) {
@@ -2547,7 +2547,7 @@ static int lkmauth(Elf_Ehdr *hdr, int len, int cnt)
 		//fix last 12 bits
 		*ptr = (unsigned int)(par & PAGE_MASK);
 		len = len - PAGE_SIZE;
-		virt_addr = virt_addr + PAGE_SIZE;
+		virt_addr = virt_addr + PAGE_SIZE;	
 		ptr++;
 	} while (len > 0);
 	kreq->module_addr_start = (u32)(unsigned long)(virt_to_phys(pBuf));
@@ -2680,13 +2680,7 @@ static void *module_alloc_update_bounds(unsigned long size)
 	return ret;
 }
 
-#if defined(CONFIG_DEBUG_KMEMLEAK) && defined(CONFIG_DEBUG_MODULE_SCAN_OFF)
-static void kmemleak_load_module(const struct module *mod,
-				 const struct load_info *info)
-{
-	kmemleak_no_scan(mod->module_core);
-}
-#elif defined(CONFIG_DEBUG_KMEMLEAK)
+#ifdef CONFIG_DEBUG_KMEMLEAK
 static void kmemleak_load_module(const struct module *mod,
 				 const struct load_info *info)
 {

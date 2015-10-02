@@ -146,8 +146,6 @@ source "drivers/hwspinlock/Kconfig"
 
 source "drivers/clocksource/Kconfig"
 
-source "drivers/motor/Kconfig"
-
 source "drivers/mailbox/Kconfig"
 
 source "drivers/iommu/Kconfig"
@@ -182,20 +180,16 @@ source "drivers/coresight/Kconfig"
 
 source "drivers/bif/Kconfig"
 
-source "drivers/battery/Kconfig"
-
 source "drivers/sensors/Kconfig"
 
-source "drivers/fingerprint/Kconfig"
+source "drivers/motor/Kconfig"
 
 source "drivers/phy/Kconfig"
 
 source "drivers/soc/Kconfig"
 
+source "drivers/battery/Kconfig"
+
 source "drivers/firmware/Kconfig"
-
-source "drivers/secfilter/Kconfig"
-
-source "drivers/gator/Kconfig"
 
 endmenu

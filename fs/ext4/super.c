@@ -388,7 +388,7 @@ static void ext4_journal_commit_callback(journal_t *journal, transaction_t *txn)
  * that error until we've noted it down and cleared it.
  */
 
-static void ext4_handle_error(struct super_block *sb, char* buf)
+static void ext4_handle_error(struct super_block *sb)
 {
 	if (sb->s_flags & MS_RDONLY)
 		return;
@@ -405,8 +405,8 @@ static void ext4_handle_error(struct super_block *sb, char* buf)
 		sb->s_flags |= MS_RDONLY;
 	}
 	if (test_opt(sb, ERRORS_PANIC))
-		panic("EXT4-fs (device %s): panic! %s\n",
-			sb->s_id, buf?buf:"no message");
+		panic("EXT4-fs (device %s): panic forced after error\n",
+			sb->s_id);
 }
 
 void __ext4_error(struct super_block *sb, const char *function,
@@ -414,25 +414,16 @@ void __ext4_error(struct super_block *sb, const char *function,
 {
 	struct va_format vaf;
 	va_list args;
-	char *page_buf;
 
 	va_start(args, fmt);
 	vaf.fmt = fmt;
 	vaf.va = &args;
 	printk(KERN_CRIT "EXT4-fs error (device %s): %s:%d: comm %s: %pV\n",
 	       sb->s_id, function, line, current->comm, &vaf);
-	page_buf = (char *)__get_free_page(GFP_ATOMIC);
-	if (page_buf)
-		sprintf(page_buf, "%s %s:%u: %pV",
-					"***Keep this device after RDX, do not reboot***", function, line, &vaf);
-	else
-		printk(KERN_ERR "__ext4_error: failed to allocate page buf for panic msg\n");
 	va_end(args);
 	save_error_info(sb, function, line);
 
-	ext4_handle_error(sb, page_buf);
-	if (page_buf)
-		free_page((unsigned long)page_buf);
+	ext4_handle_error(sb);
 }
 
 void ext4_error_inode(struct inode *inode, const char *function,
@@ -442,7 +433,6 @@ void ext4_error_inode(struct inode *inode, const char *function,
 	va_list args;
 	struct va_format vaf;
 	struct ext4_super_block *es = EXT4_SB(inode->i_sb)->s_es;
-	char *page_buf;
 
 	es->s_last_error_ino = cpu_to_le32(inode->i_ino);
 	es->s_last_error_block = cpu_to_le64(block);
@@ -462,17 +452,9 @@ void ext4_error_inode(struct inode *inode, const char *function,
 		       "inode #%lu: comm %s: %pV\n",
 		       inode->i_sb->s_id, function, line, inode->i_ino,
 		       current->comm, &vaf);
-	page_buf = (char *)__get_free_page(GFP_ATOMIC);
-	if (page_buf)
-		sprintf(page_buf, "%s %s:%u: %pV",
-					"***Keep this device after RDX, do not reboot***", function, line, &vaf);
-	else
-		printk(KERN_ERR "__ext4_error: failed to allocate page buf for panic msg\n");
 	va_end(args);
 
-	ext4_handle_error(inode->i_sb, page_buf);
-	if (page_buf)
-		free_page((unsigned long)page_buf);
+	ext4_handle_error(inode->i_sb);
 }
 
 void ext4_error_file(struct file *file, const char *function,
@@ -484,7 +466,6 @@ void ext4_error_file(struct file *file, const char *function,
 	struct ext4_super_block *es;
 	struct inode *inode = file_inode(file);
 	char pathname[80], *path;
-	char *page_buf;
 
 	es = EXT4_SB(inode->i_sb)->s_es;
 	es->s_last_error_ino = cpu_to_le32(inode->i_ino);
@@ -507,17 +488,9 @@ void ext4_error_file(struct file *file, const char *function,
 		       "comm %s: path %s: %pV\n",
 		       inode->i_sb->s_id, function, line, inode->i_ino,
 		       current->comm, path, &vaf);
-	page_buf = (char *)__get_free_page(GFP_ATOMIC);
-	if (page_buf)
-		sprintf(page_buf, "%s %s:%u: %pV",
-					"***Keep this device after RDX, do not reboot***", function, line, &vaf);
-	else
-		printk(KERN_ERR "__ext4_error: failed to allocate page buf for panic msg\n");
 	va_end(args);
 
-	ext4_handle_error(inode->i_sb, page_buf);
-	if (page_buf)
-		free_page((unsigned long)page_buf);
+	ext4_handle_error(inode->i_sb);
 }
 
 const char *ext4_decode_error(struct super_block *sb, int errno,
@@ -562,7 +535,6 @@ void __ext4_std_error(struct super_block *sb, const char *function,
 {
 	char nbuf[16];
 	const char *errstr;
-	char *page_buf;
 
 	/* Special case: if the error is EROFS, and we're not already
 	 * inside a transaction, then there's really no point in logging
@@ -576,16 +548,7 @@ void __ext4_std_error(struct super_block *sb, const char *function,
 	       sb->s_id, function, line, errstr);
 	save_error_info(sb, function, line);
 
-	page_buf = (char *)__get_free_page(GFP_ATOMIC);
-	if (page_buf)
-		sprintf(page_buf, "%s:%u: <%s>",
-					function, line, "__ext4_std_error");
-	else
-		printk(KERN_ERR "__ext4_error: failed to allocate page buf for panic msg\n");
-
-	ext4_handle_error(sb, page_buf);
-	if (page_buf)
-		free_page((unsigned long)page_buf);
+	ext4_handle_error(sb);
 }
 
 /*
@@ -659,7 +622,6 @@ __acquires(bitlock)
 	struct va_format vaf;
 	va_list args;
 	struct ext4_super_block *es = EXT4_SB(sb)->s_es;
-	char *page_buf;
 
 	es->s_last_error_ino = cpu_to_le32(ino);
 	es->s_last_error_block = cpu_to_le64(block);
@@ -676,12 +638,6 @@ __acquires(bitlock)
 	if (block)
 		printk(KERN_CONT "block %llu:", (unsigned long long) block);
 	printk(KERN_CONT "%pV\n", &vaf);
-	page_buf = (char *)__get_free_page(GFP_ATOMIC);
-	if (page_buf)
-		sprintf(page_buf, "%s %s:%u: %pV",
-					"***Keep this device after RDX, do not reboot***", function, line, &vaf);
-	else
-		printk(KERN_ERR "__ext4_error: failed to allocate page buf for panic msg\n");
 	va_end(args);
 
 	if (test_opt(sb, ERRORS_CONT)) {
@@ -690,9 +646,7 @@ __acquires(bitlock)
 	}
 
 	ext4_unlock_group(sb, grp);
-	ext4_handle_error(sb, page_buf);
-	if (page_buf)
-		free_page((unsigned long)page_buf);
+	ext4_handle_error(sb);
 	/*
 	 * We only get here in the ERRORS_RO case; relocking the group
 	 * may be dangerous, but nothing bad will happen since the
@@ -2469,6 +2423,25 @@ static ssize_t lifetime_write_kbytes_show(struct ext4_attr *a,
 			  EXT4_SB(sb)->s_sectors_written_start) >> 1)));
 }
 
+static ssize_t r_blocks_count_show(struct ext4_attr *a,
+		struct ext4_sb_info *sbi, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%llu\n",
+			(unsigned long long) atomic64_read(&sbi->s_r_blocks_count));
+}
+
+static ssize_t r_blocks_count_store(struct ext4_attr *a,
+		struct ext4_sb_info *sbi, const char *buf, size_t count)
+{
+	unsigned long long val;
+
+	if (parse_strtoull(buf, -1ULL, &val))
+		return -EINVAL;
+	atomic64_set(&sbi->s_r_blocks_count, val);
+
+	return count;
+}
+
 static ssize_t inode_readahead_blks_store(struct ext4_attr *a,
 					  struct ext4_sb_info *sbi,
 					  const char *buf, size_t count)
@@ -2568,6 +2541,7 @@ static struct ext4_attr ext4_attr_##name = __ATTR(name, mode, show, store)
 EXT4_RO_ATTR(delayed_allocation_blocks);
 EXT4_RO_ATTR(session_write_kbytes);
 EXT4_RO_ATTR(lifetime_write_kbytes);
+EXT4_RW_ATTR(r_blocks_count);
 EXT4_RW_ATTR(reserved_clusters);
 EXT4_ATTR_OFFSET(inode_readahead_blks, 0644, sbi_ui_show,
 		 inode_readahead_blks_store, s_inode_readahead_blks);
@@ -2586,6 +2560,7 @@ static struct attribute *ext4_attrs[] = {
 	ATTR_LIST(delayed_allocation_blocks),
 	ATTR_LIST(session_write_kbytes),
 	ATTR_LIST(lifetime_write_kbytes),
+	ATTR_LIST(r_blocks_count),
 	ATTR_LIST(reserved_clusters),
 	ATTR_LIST(inode_readahead_blks),
 	ATTR_LIST(inode_goal),
@@ -4035,6 +4010,8 @@ no_journal:
 			 "available");
 	}
 
+	atomic64_set(&sbi->s_r_blocks_count, ext4_r_blocks_count(es));
+
 	err = ext4_reserve_clusters(sbi, ext4_calculate_resv_clusters(sb));
 	if (err) {
 		ext4_msg(sb, KERN_ERR, "failed to reserve %llu clusters for "
@@ -4913,8 +4890,8 @@ static int ext4_statfs(struct dentry *dentry, struct kstatfs *buf)
 	/* prevent underflow in case that few free space is available */
 	buf->f_bfree = EXT4_C2B(sbi, max_t(s64, bfree, 0));
 	buf->f_bavail = buf->f_bfree -
-			(ext4_r_blocks_count(es) + resv_blocks);
-	if (buf->f_bfree < (ext4_r_blocks_count(es) + resv_blocks))
+			(atomic64_read(&sbi->s_r_blocks_count) + resv_blocks);
+	if (buf->f_bfree < (atomic64_read(&sbi->s_r_blocks_count) + resv_blocks))
 		buf->f_bavail = 0;
 	buf->f_files = le32_to_cpu(es->s_inodes_count);
 	buf->f_ffree = percpu_counter_sum_positive(&sbi->s_freeinodes_counter);
@@ -5284,6 +5261,7 @@ out:
 }
 
 #endif
+
 void print_iloc_info(struct super_block *sb, struct ext4_iloc iloc)
 {
 	/* for debugging, woojoong.lee */

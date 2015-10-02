@@ -184,9 +184,6 @@ struct mdss_mdp_ctl {
 	u32 num;
 	char __iomem *base;
 	char __iomem *wb_base;
-#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-	resource_size_t physical_base;
-#endif
 	u32 ref_cnt;
 	int power_state;
 
@@ -519,33 +516,6 @@ struct mdss_mdp_commit_cb {
 		void *data);
 };
 
-#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-struct mdss_mdp_cmd_ctx {
-	struct mdss_mdp_ctl *ctl;
-	u32 pp_num;
-	u8 ref_cnt;
-	struct completion stop_comp;
-	wait_queue_head_t pp_waitq;
-	struct list_head vsync_handlers;
-	int panel_power_state;
-	atomic_t koff_cnt;
-	int clk_enabled;
-	int vsync_enabled;
-	int rdptr_enabled;
-	struct mutex clk_mtx;
-	spinlock_t clk_lock;
-	spinlock_t koff_lock;
-	struct work_struct clk_work;
-	struct work_struct pp_done_work;
-	atomic_t pp_done_cnt;
-	struct mdss_intf_recovery intf_recovery;
-	struct mdss_mdp_cmd_ctx *sync_ctx; /* for partial update */
-	u32 pp_timeout_report_cnt;
-};
-#endif
-
-
-
 /**
  * enum mdss_screen_state - Screen states that MDP can be forced into
  *
@@ -752,6 +722,8 @@ static inline u32 left_lm_w_from_mfd(struct msm_fb_data_type *mfd)
 }
 
 irqreturn_t mdss_mdp_isr(int irq, void *ptr);
+int mdss_iommu_attach(struct mdss_data_type *mdata);
+int mdss_iommu_dettach(struct mdss_data_type *mdata);
 void mdss_mdp_irq_clear(struct mdss_data_type *mdata,
 		u32 intr_type, u32 intf_num);
 int mdss_mdp_irq_enable(u32 intr_type, u32 intf_num);
@@ -770,6 +742,9 @@ int mdss_mdp_vsync_clk_enable(int enable);
 void mdss_mdp_clk_ctrl(int enable);
 struct mdss_data_type *mdss_mdp_get_mdata(void);
 int mdss_mdp_secure_display_ctrl(unsigned int enable);
+
+#define SEC_DEVICE_MDSS		1
+void __mdss_restore_sec_cfg(struct mdss_data_type *mdata);
 
 int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd);
 int mdss_mdp_overlay_req_check(struct msm_fb_data_type *mfd,
@@ -851,8 +826,9 @@ int mdss_mdp_display_wait4pingpong(struct mdss_mdp_ctl *ctl);
 int mdss_mdp_display_wakeup_time(struct mdss_mdp_ctl *ctl,
 				 ktime_t *wakeup_time);
 
-int mdss_mdp_csc_setup(u32 block, u32 blk_idx, u32 csc_type);
-int mdss_mdp_csc_setup_data(u32 block, u32 blk_idx, struct mdp_csc_cfg *data);
+int mdss_mdp_csc_setup(u32 block, u32 blk_idx, u32 tbl_idx, u32 csc_type);
+int mdss_mdp_csc_setup_data(u32 block, u32 blk_idx, u32 tbl_idx,
+				   struct mdp_csc_cfg *data);
 
 int mdss_mdp_pp_init(struct device *dev);
 void mdss_mdp_pp_term(struct device *dev);
@@ -983,8 +959,4 @@ int mdss_mdp_wb_set_secure(struct msm_fb_data_type *mfd, int enable);
 int mdss_mdp_wb_get_secure(struct msm_fb_data_type *mfd, uint8_t *enable);
 void mdss_mdp_ctl_restore(void);
 int  mdss_mdp_ctl_reset(struct mdss_mdp_ctl *ctl);
-#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-void mdss_dsi_check_te(void);
-void mdss_mdp_underrun_clk_info(void);
-#endif
 #endif /* MDSS_MDP_H */

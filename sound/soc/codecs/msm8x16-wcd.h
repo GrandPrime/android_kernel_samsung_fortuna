@@ -18,9 +18,6 @@
 #include <linux/mfd/wcd9xxx/pdata.h>
 #include "wcd-mbhc-v2.h"
 #include "wcdcal-hwdep.h"
-#ifdef CONFIG_SND_SOC_MSM8X16_WM1814
-#include "../msm/msm8x16-machine.h"
-#endif /* CONFIG_SND_SOC_MSM8X16_WM1814 */
 
 #define MSM8X16_WCD_NUM_REGISTERS	0x6FF
 #define MSM8X16_WCD_MAX_REGISTER	(MSM8X16_WCD_NUM_REGISTERS-1)
@@ -159,7 +156,6 @@ struct msm8x16_wcd_regulator {
 	struct regulator *regulator;
 };
 
-#ifndef CONFIG_SND_SOC_MSM8X16_WM1814
 struct msm8916_asoc_mach_data {
 	int codec_type;
 	int ext_pa;
@@ -177,7 +173,6 @@ struct msm8916_asoc_mach_data {
 	void __iomem *vaddr_gpio_mux_spkr_ctl;
 	void __iomem *vaddr_gpio_mux_mic_ctl;
 };
-#endif /* CONFIG_SND_SOC_MSM8X16_WM1814 */
 
 struct msm8x16_wcd_pdata {
 	int irq;

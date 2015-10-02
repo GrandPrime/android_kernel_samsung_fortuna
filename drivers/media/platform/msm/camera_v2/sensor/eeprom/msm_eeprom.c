@@ -19,6 +19,7 @@
 #include "msm_cci.h"
 #include "msm_eeprom.h"
 
+//#define MSM_EEPROM_DEBUG
 #undef CDBG
 #ifdef MSM_EEPROM_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
@@ -119,9 +120,6 @@ static int read_eeprom_memory(struct msm_eeprom_ctrl_t *e_ctrl,
 	int j;
 	struct msm_eeprom_memory_map_t *emap = block->map;
 	uint8_t *memptr = block->mapdata;
-#ifdef CONFIG_SEC_A8_PROJECT
-	uint32_t size = 0;
-#endif
 
 	pr_err("%s Enter \n", __func__);
 
@@ -163,52 +161,6 @@ static int read_eeprom_memory(struct msm_eeprom_ctrl_t *e_ctrl,
 
 		if (emap[j].mem.valid_size) {
 			e_ctrl->i2c_client.addr_type = emap[j].mem.addr_t;
-
-#ifdef CONFIG_SEC_A8_PROJECT
-                        /* In A8 Project, EEPROM uses QUP I2C, QUP supports 3825bytes I2C read at a time,
-                           Here 4608Bytes will be read from EEPROM, So 4608Bytes are divided into two parts,
-			   3824 bytes and 784 bytes. */
-                        if(emap[j].mem.valid_size > 3824)
-			{
-				size = 3824;
-				CDBG("%s %d mem.addr %x memptr %x size %d\n", __func__, __LINE__, \
-					(uint32_t)emap[j].mem.addr, (uint32_t)memptr, size);
-				rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_read_seq(
-					&(e_ctrl->i2c_client), emap[j].mem.addr,
-					memptr, size);
-				if (rc < 0) {
-					pr_err("%s: read failed\n", __func__);
-					return rc;
-				}
-
-				size = emap[j].mem.valid_size - 3824;
-				memptr += 3824;
-
-				CDBG("%s %d mem.addr %x memptr %x size %d\n", __func__, __LINE__, \
-					(uint32_t)(emap[j].mem.addr + 3824), (uint32_t)memptr, size);
-                                rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_read_seq(
-                                        &(e_ctrl->i2c_client),(emap[j].mem.addr + 3824) ,
-                                        memptr, size);
-                                if (rc < 0) {
-                                        pr_err("%s: read failed\n", __func__);
-                                        return rc;
-                                }
-				memptr += size;
-			}
-			else
-			{
-				CDBG("%s %d mem.addr %x memptr %x size %d\n", __func__, __LINE__, \
-					(uint32_t)emap[j].mem.addr, (uint32_t)memptr, emap[j].mem.valid_size);
-				rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_read_seq(
-					&(e_ctrl->i2c_client), emap[j].mem.addr,
-					memptr, emap[j].mem.valid_size);
-				if (rc < 0) {
-					pr_err("%s: read failed\n", __func__);
-					return rc;
-				}
-				memptr += emap[j].mem.valid_size;
-			}
-#else
 			pr_err("%s %d \n", __func__, __LINE__);
 			rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_read_seq(
 				&(e_ctrl->i2c_client), emap[j].mem.addr,
@@ -219,7 +171,6 @@ static int read_eeprom_memory(struct msm_eeprom_ctrl_t *e_ctrl,
 				return rc;
 			}
 			memptr += emap[j].mem.valid_size;
-#endif
 		}
 	}
 

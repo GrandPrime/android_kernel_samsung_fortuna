@@ -68,11 +68,13 @@ static int zram_show_mem_notifier(struct notifier_block *nb,
 
 		if (zram->init_done) {
 			u64 val;
+			u64 data_size;
 
 			val = zs_get_total_pages(meta->mem_pool);
-			pr_info("Zram[%d] mem_used_total = %llu\n", i, val << PAGE_SHIFT);
+			data_size = atomic64_read(&zram->stats.compr_size);
+			pr_info("Zram[%d] mem_used_total = %llu\n", i, val);
 			pr_info("Zram[%d] compr_data_size = %llu\n", i,
-				atomic64_read(&zram->stats.compr_size));
+				(unsigned long long)data_size);
 			pr_info("Zram[%d] orig_data_size = %u\n", i,
 				zram->stats.pages_stored);
 		}
@@ -906,7 +908,6 @@ static int create_device(struct zram *zram, int device_id)
 	zram->disk->private_data = zram;
 	snprintf(zram->disk->disk_name, 16, "zram%d", device_id);
 
-	__set_bit(QUEUE_FLAG_FAST, &zram->queue->queue_flags);
 	/* Actual capacity set using syfs (/sys/block/zram<id>/disksize */
 	set_capacity(zram->disk, 0);
 

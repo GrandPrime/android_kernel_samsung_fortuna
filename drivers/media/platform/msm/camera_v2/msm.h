@@ -49,7 +49,7 @@ REAR_FRONT_TUNING
 #define MSM_POST_EVT_NOTIMEOUT 0xFFFFFFFF
 #define MSM_CAMERA_STREAM_CNT_BITS  32
 
-#ifndef CONFIG_ARCH_MSM8939
+#if !defined(CONFIG_ARCH_MSM8939) && !defined(CONFIG_ARCH_MSM8929)
 #define CAMERA_DISABLE_PC_LATENCY 200
 #define CAMERA_ENABLE_PC_LATENCY PM_QOS_DEFAULT_VALUE
 #endif
@@ -122,7 +122,7 @@ struct msm_session {
 	struct mutex lock;
 };
 
-#ifndef CONFIG_ARCH_MSM8939
+#if !defined(CONFIG_ARCH_MSM8939) && !defined(CONFIG_ARCH_MSM8929)
 void msm_pm_qos_update_request(int val);
 #endif
 

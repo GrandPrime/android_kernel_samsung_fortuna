@@ -720,7 +720,6 @@ static int __init msm_hw_rev_setup(char *p)
 	return 0;
 }
 early_param("samsung.board_rev", msm_hw_rev_setup);
-
 static void __init request_standard_resources(const struct machine_desc *mdesc)
 {
 	struct memblock_region *region;
@@ -883,7 +882,6 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_SEC_DEBUG_SUBSYS
 	unit_name = machine_name;
 #endif
-
 	setup_dma_zone(mdesc);
 
 	if (mdesc->reboot_mode != REBOOT_HARD)
