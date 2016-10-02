@@ -109,7 +109,7 @@ static int set_tamper_fuse_cmd_new(uint32_t flag)
 }
 
 static uint8_t get_tamper_fuse_cmd()
-{ 
+{
 	int ret;
 	uint32_t fuse_id;
 	uint8_t resp_buf;

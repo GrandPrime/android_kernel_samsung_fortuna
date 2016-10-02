@@ -9,6 +9,17 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+
+#if defined(CONFIG_ABNORMAL_CHARGE_CHECK)
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/syscalls.h>
+#include <linux/fcntl.h>
+#include <asm/uaccess.h>
+#include <linux/kmod.h>
+#endif
+
 #include <linux/battery/sec_battery.h>
 #if defined(CONFIG_SENSORS_QPNP_ADC_VOLTAGE)
 #include <linux/qpnp/qpnp-adc.h>
@@ -27,10 +38,6 @@
 
 #ifdef CONFIG_SAMSUNG_BATTERY_DISALLOW_DEEP_SLEEP
 struct clk * xo_chr = NULL;
-#endif
-
-#if defined(CONFIG_MACH_KOR_EARJACK_WR)
-struct sec_battery_info *g_battery;
 #endif
 
 static struct device_attribute sec_battery_attrs[] = {
@@ -61,7 +68,6 @@ static struct device_attribute sec_battery_attrs[] = {
 	SEC_BATTERY_ATTR(fg_reg_dump),
 	SEC_BATTERY_ATTR(fg_reset_cap),
 	SEC_BATTERY_ATTR(fg_capacity),
-	SEC_BATTERY_ATTR(fg_asoc),
 	SEC_BATTERY_ATTR(auth),
 	SEC_BATTERY_ATTR(chg_current_adc),
 	SEC_BATTERY_ATTR(wc_adc),
@@ -701,7 +707,6 @@ static bool sec_bat_ovp_uvlo_result(
 			sec_bat_set_charging_status(battery, POWER_SUPPLY_STATUS_CHARGING);
 			battery->charging_mode = SEC_BATTERY_CHARGING_1ST;
 			sec_bat_set_charge(battery, true);
-			battery->health_check_count = 0;
 			break;
 		case POWER_SUPPLY_HEALTH_OVERVOLTAGE:
 		case POWER_SUPPLY_HEALTH_UNDERVOLTAGE:
@@ -712,7 +717,6 @@ static bool sec_bat_ovp_uvlo_result(
 			sec_bat_set_charge(battery, false);
 			battery->charging_mode = SEC_BATTERY_CHARGING_NONE;
 			battery->is_recharging = false;
-			battery->health_check_count = DEFAULT_HEALTH_CHECK_COUNT;
 			/* Take the wakelock during 10 seconds
 			   when over-voltage status is detected	 */
 			wake_lock_timeout(&battery->vbus_wake_lock, HZ * 10);
@@ -875,7 +879,6 @@ static bool sec_bat_voltage_check(struct sec_battery_info *battery)
 			power_supply_changed(&battery->psy_bat);
 			dev_info(battery->dev,
 				"%s: battery status full -> charging, RepSOC(%d)\n", __func__, value.intval);
-			return false;
 		}
 	}
 
@@ -2003,85 +2006,132 @@ static bool sec_bat_fullcharged_check(
 	return true;
 }
 
-#if defined(CONFIG_MACH_KOR_EARJACK_WR)
-extern bool sec_jack_onoff(void);
-extern bool primary_sound_onoff(void);
-static bool sec_bat_check_earjack_state(struct sec_battery_info *battery)
-{
-	if (!battery->earjack_wr_enable ||
-		(battery->status != POWER_SUPPLY_STATUS_CHARGING &&
-		battery->status != POWER_SUPPLY_STATUS_FULL)) {
-		return false;
-	}
-	return true;
+#if defined(CONFIG_ABNORMAL_CHARGE_CHECK)
+static int get_property_value(char *property, char *key, char *value){
+    int i=0;
+    int j=0;
+    char stringbuffer[100];
+
+    while(property[i] == key[i])
+        i++;
+
+    if(property[i] == '='){
+        i++;
+        while(property[i] != '0')
+            stringbuffer[j++] = property[i++];
+        stringbuffer[j] = 0;
+        strcpy(value, stringbuffer);
+        pr_info("%s : Property - %s\n", __func__, property);
+        return 1;
+    }
+    return 0;
 }
 
-void set_earjack_state(void)
-{
-	if (g_battery && sec_bat_check_earjack_state(g_battery)) {
-		wake_lock(&g_battery->monitor_wake_lock);
-		queue_delayed_work(g_battery->monitor_wqueue, &g_battery->monitor_work, 0);
-	}
+static void check_shipmode(struct sec_battery_info *battery){
+    char *prop_file_name = "/system/build.prop";
+    int pfd;
+    char buffer[1];
+    char stringbuffer[100];
+    char value[100];
+    int cnt;
+
+    mm_segment_t old_fs = get_fs();
+    set_fs(KERNEL_DS);
+
+    pr_info("%s : Check Shipping mode\n", __func__);
+
+    pfd = sys_open(prop_file_name, O_RDONLY, 0);
+    if(pfd >= 0){
+        cnt = 0;
+        while(sys_read(pfd, buffer, 1) == 1){
+            stringbuffer[cnt] = buffer[0];
+            if(stringbuffer[cnt] == '\n'){
+                stringbuffer[cnt] = 0;
+                if(get_property_value(stringbuffer, "#ro.product_ship", value)){
+                    pr_info("%s : Matched, Value = %s\n", __func__, value);
+                    if(strcmp(value, "true") == 0){
+                        sys_close(pfd);
+                        set_fs(old_fs);
+                        battery->is_shipmode = 1;
+                        return;
+                    }
+                }
+                cnt = 0;
+            }
+            cnt++;
+        }
+        pr_info("\n");
+        sys_close(pfd);
+    }
+
+    set_fs(old_fs);
+    battery->is_shipmode = 0;
+    return;
+}
+static void sec_bat_turnon_lowbattdump(struct sec_battery_info *battery){
+    int ret;
+    char *argv[] = { "/system/bin/sh", "/system/bin/am", "broadcast", "-a", "com.samsung.systemui.power.action.LOW_BATTERY_DUMP", NULL};
+    static char *envp[] = {
+    "HOME=/",
+    "PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin",
+    "BOOTCLASSPATH=/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/okhttp.jar:/system/framework/core-junit.jar:/system/framework/bouncycastle.jar:/system/framework/ext.jar:/system/framework/framework.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/system/framework/mms-common.jar:/system/framework/android.policy.jar:/system/framework/apache-xml.jar:/system/framework/sec_edm.jar:/system/framework/seccamera.jar:/system/framework/timakeystore.jar:/system/framework/commonimsinterface.jar:/system/framework/imsmanager.jar:/system/framework/qcmediaplayer.jar:/system/framework/WfdCommon.jar:/system/framework/oem-services.jar:/system/framework/org.codeaurora.Performance.jar",
+    NULL};
+    ret=call_usermodehelper( argv[0], argv, envp, 1 );
+    pr_info("%s : Lowbatt Dump Mode is working. / ret = %d\n",__func__, ret);
+    battery->is_abnormal_logging = 1;
 }
 
-void set_soundpath_state(void)
-{
-	if (g_battery && sec_jack_onoff() &&
-		sec_bat_check_earjack_state(g_battery)) {
-		wake_lock(&g_battery->monitor_wake_lock);
-		queue_delayed_work(g_battery->monitor_wqueue, &g_battery->monitor_work, 0);
-	}
-}
+static void sec_bat_abnormalcharge_check(struct sec_battery_info *battery){
+    int socDelta;
+    int currentSoc;
 
-static void sec_bat_earjack_lcd_state(struct sec_battery_info *battery, int lcd_state)
-{
-	int prev_lcd_state = (battery->earjack_wr_state & EARJACK_WR_LCD) ? 1 : 0;
-	if (prev_lcd_state != lcd_state) {
-		battery->earjack_wr_state = (lcd_state) ?
-				(battery->earjack_wr_state | EARJACK_WR_LCD) :
-				(battery->earjack_wr_state & ~EARJACK_WR_LCD);
+    pr_info("%s : shipmode is = %d, abnormal logging = %d\n", __func__, battery->is_shipmode, battery->is_abnormal_logging);
+    if(battery->is_shipmode == -1)
+        check_shipmode(battery);
+    else if(battery->is_shipmode == 0 && battery->is_abnormal_logging == 0){
+        pr_info("%s : battery status = %d\n", __func__, battery->status);
+        switch(battery->status){
+        case POWER_SUPPLY_STATUS_NOT_CHARGING:
+            battery->not_charging_count++;
+            battery->prev_soc = -1;
+            pr_info("%s : Not Charging count is %d\n", __func__, battery->not_charging_count);
+            if(battery->not_charging_count > 10){
+                pr_info("%s : Abnormal Charging Detected\n", __func__);
+                sec_bat_turnon_lowbattdump(battery);
+            }
+            break;
+        case POWER_SUPPLY_STATUS_CHARGING:
+            currentSoc = battery->capacity;
+            battery->not_charging_count=0;
+            if(battery->prev_soc == -1) battery->prev_soc = currentSoc;
+            socDelta = battery->prev_soc - currentSoc;
 
-		if (sec_bat_check_earjack_state(battery)) {
-			wake_lock(&battery->monitor_wake_lock);
-			queue_delayed_work(battery->monitor_wqueue, &battery->monitor_work, 0);
-		}
-	}
-}
-
-static int sec_bat_get_earjack_input_current(struct sec_battery_info *battery)
-{
-	int earjack_wr_state = EARJACK_WR_NONE;
-	int input_current_limit = battery->pdata->charging_current
-						[battery->cable_type].input_current_limit;
-	int ret_val = input_current_limit;
-
-	if (sec_bat_check_earjack_state(battery)) {
-		earjack_wr_state |= sec_jack_onoff() ? EARJACK_WR_EARJACK : EARJACK_WR_NONE;
-		earjack_wr_state |= primary_sound_onoff() ? EARJACK_WR_SOUNDPATH : EARJACK_WR_NONE;
-		earjack_wr_state |= battery->earjack_wr_state & EARJACK_WR_LCD;
-		battery->earjack_wr_state = earjack_wr_state;
-		
-		if (battery->earjack_wr_state & EARJACK_WR_EARJACK) {
-			if (battery->capacity >= battery->earjack_wr_soc_2nd) {
-				if (!(battery->earjack_wr_state & EARJACK_WR_LCD) &&
-					!(battery->earjack_wr_state & EARJACK_WR_SOUNDPATH)) {
-					input_current_limit = battery->earjack_wr_input_current_1st;
-				} else {
-					input_current_limit = battery->earjack_wr_input_current_2nd;
-				}
-			} else if (battery->capacity >= battery->earjack_wr_soc_1st) {
-				input_current_limit = battery->earjack_wr_input_current_1st;
-			}
-		}
-		ret_val = (input_current_limit <= ret_val) ?
-			input_current_limit : ret_val;
-	}
-
-	pr_info("%s: state=0x%x,capacity=%d, ret_val=%d, input_current=%d\n",
-		__func__, battery->earjack_wr_state, battery->capacity,
-		ret_val, input_current_limit);
-
-	return ret_val;
+            pr_info("%s : prev_soc = %d, capacity = %d / %d\n", __func__, battery->prev_soc, battery->capacity, socDelta);
+            if(socDelta > 5){
+                pr_info("%s : Abnormal Charging Detected.\n", __func__);
+                pr_info("%s : SoC dropped over than 5\n", __func__);
+                sec_bat_turnon_lowbattdump(battery);
+            }
+            if(battery->prev_soc < currentSoc)
+                battery->prev_soc = currentSoc;
+            break;
+        case POWER_SUPPLY_STATUS_FULL:
+            battery->not_charging_count=0;
+            battery->prev_soc = -1;
+            if(battery->voltage_now < 3500){
+                pr_info("%s : Abnormal Charging Detected.\n", __func__);
+                pr_info("%s : Voltage is lower than 3500, current_voltage is %d\n", __func__, battery->voltage_now);
+                sec_bat_turnon_lowbattdump(battery);
+            }
+            break;
+        case POWER_SUPPLY_STATUS_DISCHARGING:
+            battery->not_charging_count=0;
+            battery->prev_soc = -1;
+            break;
+        default:
+            break;
+        }
+    }
 }
 #endif
 
@@ -2207,26 +2257,15 @@ static void sec_bat_get_battery_info(
 		then ignore FG SOC, and report (previous SOC +1)% */
 	if (battery->status != POWER_SUPPLY_STATUS_FULL) {
 		battery->capacity = value.intval;
-	} else if ((c_ts.tv_sec - old_ts.tv_sec) >= 30) {
-		if (battery->capacity != 100) {
-			battery->capacity++;
-			pr_info("%s : forced full-charged sequence for the capacity(%d)\n",
-				__func__, battery->capacity);
-		}
-		/* update capacity max */
-		value.intval = battery->capacity;
-		psy_do_property(battery->pdata->fuelgauge_name, set,
-			POWER_SUPPLY_PROP_CHARGE_FULL, value);
+	} else if ((battery->capacity != 100) &&
+		   ((c_ts.tv_sec - old_ts.tv_sec) >= 60)) {
+		battery->capacity++;
+		pr_info("%s : forced full-charged sequence for the capacity(%d)\n",
+			__func__, battery->capacity);
 		old_ts = c_ts;
 	}
 #else
 	battery->capacity = value.intval;
-#endif
-
-#if defined(CONFIG_MACH_KOR_EARJACK_WR)
-	value.intval = sec_bat_get_earjack_input_current(battery);
-	psy_do_property(battery->pdata->charger_name, set,
-			POWER_SUPPLY_PROP_INPUT_CURRENT_MAX, value);
 #endif
 
 	dev_info(battery->dev,
@@ -2465,13 +2504,30 @@ static void sec_bat_monitor_work(
 	struct sec_battery_info *battery =
 		container_of(work, struct sec_battery_info,
 		monitor_work.work);
+	static struct timespec old_ts;
+	struct timespec c_ts;
 
 	dev_dbg(battery->dev, "%s: Start\n", __func__);
+#if defined(ANDROID_ALARM_ACTIVATED)
+	c_ts = ktime_to_timespec(alarm_get_elapsed_realtime());
+#else
+	c_ts = ktime_to_timespec(ktime_get_boottime());
+#endif
 
 	/* monitor once after wakeup */
 	if (battery->polling_in_sleep) {
 		battery->polling_in_sleep = false;
+		if ((battery->status == POWER_SUPPLY_STATUS_DISCHARGING) &&
+			(battery->ps_enable != true)) {
+			if ((unsigned long)(c_ts.tv_sec - old_ts.tv_sec) < 10 * 60) {
+				pr_info("Skip monitor_work(%ld)\n",
+						c_ts.tv_sec - old_ts.tv_sec);
+				goto skip_monitor;
+			}
+		}
 	}
+	/* update last monitor time */
+	old_ts = c_ts;
 
 	sec_bat_get_battery_info(battery);
 
@@ -2538,6 +2594,10 @@ continue_monitor:
 		sec_bat_charging_mode_str[battery->charging_mode],
 		sec_bat_health_str[battery->health],
 		battery->cable_type, battery->pdata->vendor, battery->siop_level);
+#if defined(CONFIG_ABNORMAL_CHARGE_CHECK)
+    /* 8. Abnormal Charge Check */
+    sec_bat_abnormalcharge_check(battery);
+#endif
 #if defined(CONFIG_SAMSUNG_BATTERY_ENG_TEST)
 	dev_info(battery->dev,
 			"%s: battery->stability_test(%d), battery->eng_not_full_status(%d)\n",
@@ -2560,6 +2620,7 @@ continue_monitor:
 	}
 	power_supply_changed(&battery->psy_bat);
 
+skip_monitor:
 	sec_bat_set_polling(battery);
 
 	if (battery->capacity <= 0 || battery->health_change)
@@ -2933,12 +2994,6 @@ ssize_t sec_bat_show_attrs(struct device *dev,
 	case FG_REG_DUMP:
 		break;
 	case FG_RESET_CAP:
-		break;
-	case FG_ASOC:
-		psy_do_property(battery->pdata->fuelgauge_name, get,
-				POWER_SUPPLY_PROP_ENERGY_FULL, value);
-		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
-				value.intval);
 		break;
 	case FG_CAPACITY:
 	{
@@ -3489,9 +3544,6 @@ ssize_t sec_bat_store_attrs(
 			/* we need to test
 			sec_bat_event_set(battery, EVENT_LCD, x);
 			*/
-#if defined(CONFIG_MACH_KOR_EARJACK_WR)
-			sec_bat_earjack_lcd_state(battery, x);
-#endif
 			ret = count;
 		}
 		break;
@@ -3691,7 +3743,7 @@ static int sec_bat_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ONLINE:
 			current_cable_type = val->intval;
 
-#if defined(CONFIG_CHARGER_RT5033) && defined(CONFIG_SM5504_MUIC)
+#if defined(CONFIG_CHARGER_RT5033)
                 if(current_cable_type != POWER_SUPPLY_TYPE_UNKNOWN &&
                         current_cable_type != POWER_SUPPLY_TYPE_BATTERY)
 			msleep(150);
@@ -3939,11 +3991,6 @@ static int sec_bat_get_property(struct power_supply *psy,
 			val->intval = 0;
 		break;
 #endif
-#if defined(CONFIG_MACH_KOR_EARJACK_WR)
-	case POWER_SUPPLY_PROP_INPUT_CURRENT_MAX:
-		val->intval = sec_bat_get_earjack_input_current(battery);
-		break;
-#endif
 	default:
 		return -EINVAL;
 	}
@@ -4114,6 +4161,16 @@ static int sec_ps_set_property(struct power_supply *psy,
 			battery->ps_status = false;
 			dev_info(battery->dev,
 				"%s: power sharing cable plugout (%d)\n", __func__, battery->ps_status);
+#if defined(CONFIG_SM5502_MUIC) || defined(CONFIG_SM5504_MUIC)
+			battery->ps_enable = false;
+			dev_info(battery->dev,
+					"%s: power sharing cable disconnected! ps disable (%d)\n",
+					__func__, battery->ps_enable);
+
+			value.intval = POWER_SUPPLY_TYPE_POWER_SHARING;
+			psy_do_property(battery->pdata->charger_name, set,
+					POWER_SUPPLY_PROP_ONLINE, value);
+#endif
 			wake_lock(&battery->monitor_wake_lock);
 			queue_delayed_work(battery->monitor_wqueue, &battery->monitor_work, 0);
 		}
@@ -4704,10 +4761,9 @@ static int sec_bat_parse_dt(struct device *dev,
 	ret = of_property_read_u32(np, "battery,swelling_chg_current",
 		&pdata->swelling_chg_current);
 	if (ret) {
-		pr_info("%s: swelling low temp chg current is Empty, Defualt value 1300mA \n", __func__);
+		pr_info("%s: swelling low temp chg current is Empty, Defualt value 0mA \n", __func__);
 		pdata->swelling_chg_current = 0;
 	}
-	pr_info("%s: swelling_chg_current : %d\n", __func__, pdata->swelling_chg_current);
 
 	ret = of_property_read_u32(np, "battery,swelling_drop_float_voltage",
 		(unsigned int *)&pdata->swelling_drop_float_voltage);
@@ -4985,10 +5041,6 @@ static int sec_battery_probe(struct platform_device *pdev)
 			goto err_bat_free;
 		}
 	}
-#endif
-
-#if defined(CONFIG_MACH_KOR_EARJACK_WR)
-	g_battery = battery;
 #endif
 
 	/* create work queue */

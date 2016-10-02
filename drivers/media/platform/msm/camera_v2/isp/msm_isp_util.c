@@ -30,7 +30,7 @@ static struct msm_isp_bandwidth_mgr isp_bandwidth_mgr;
 
 #define VFE40_8974V2_VERSION 0x1001001A
 
-#ifndef CONFIG_ARCH_MSM8939
+#if !defined(CONFIG_ARCH_MSM8939) && !defined(CONFIG_ARCH_MSM8929)
 #define CAMERA_BOOST
 #endif
 

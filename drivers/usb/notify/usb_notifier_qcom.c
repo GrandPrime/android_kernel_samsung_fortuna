@@ -27,7 +27,7 @@ struct usb_notifier_platform_data {
 	struct	gadget_notify_dev g_ndev;
 	struct	notifier_block usb_nb;
 	int	gpio_redriver_en;
-	int	gpio_otg_en;
+	int   disable_control_en;
 };
 
 enum {
@@ -51,22 +51,12 @@ static void of_get_usb_redriver_dt(struct device_node *np,
 	pr_info("redriver_en : %d\n", pdata->gpio_redriver_en);
 }
 
-static void of_get_otg_en_dt(struct device_node *np,
+static void of_get_disable_control_en_dt(struct device_node *np,
 		struct usb_notifier_platform_data *pdata)
 {
-	pdata->gpio_otg_en = of_get_named_gpio(np, "qcom,gpios_otg_en", 0);
-	if (pdata->gpio_otg_en < 0) {
-		pr_info("There is no otg_en pin\n");
-		return;
-	}
+	of_property_read_u32(np, "qcom,disable_control_en", &pdata->disable_control_en);
 
-	if (!gpio_is_valid(pdata->gpio_otg_en)) {
-		pr_err("%s: gpios_otg_en : Invalied gpio pins\n", __func__);
-		return;
-	}
-
-	gpio_set_value(pdata->gpio_otg_en, 0);
-	pr_info("gpio_get_value(%d) = %d\n", pdata->gpio_otg_en, gpio_get_value(pdata->gpio_otg_en));
+	pr_info("disable_control_en : %d\n", pdata->disable_control_en);
 }
 
 static int of_usb_notifier_dt(struct device *dev,
@@ -78,7 +68,7 @@ static int of_usb_notifier_dt(struct device *dev,
 		return -EINVAL;
 
 	of_get_usb_redriver_dt(np, pdata);
-	of_get_otg_en_dt(np, pdata);
+	of_get_disable_control_en_dt(np, pdata);
 	return 0;
 }
 
@@ -122,7 +112,6 @@ static void usbgadget_ready(struct work_struct *work)
 
 static int otg_accessory_power(bool enable)
 {
-	struct usb_notifier_platform_data *pdata = of_get_usb_notifier_pdata();
 	struct power_supply *psy_otg, *psy_battery;
 	union power_supply_propval val;
 	int on = !!enable;
@@ -144,10 +133,6 @@ static int otg_accessory_power(bool enable)
 
 		val.intval = current_cable_type;
 		ret = psy_battery->set_property(psy_battery, POWER_SUPPLY_PROP_ONLINE, &val);
-	} else if (pdata->gpio_otg_en >= 0) {
-		pr_info("before gpio_get_value(%d) = %d\n", pdata->gpio_otg_en, gpio_get_value(pdata->gpio_otg_en));
-		gpio_set_value(pdata->gpio_otg_en, on);
-		pr_info("after gpio_get_value(%d) = %d\n", pdata->gpio_otg_en, gpio_get_value(pdata->gpio_otg_en));
 	} else {
 		pr_err("%s: Fail to get psy battery\n", __func__);
 		return -1;
@@ -258,6 +243,8 @@ static int usb_notifier_probe(struct platform_device *pdev)
 			msecs_to_jiffies(15000));
 
 	sec_otg_notify.redriver_en_gpio = pdata->gpio_redriver_en;
+	if (pdata->disable_control_en == 1)
+		sec_otg_notify.disable_control = 1;
 	set_otg_notify(&sec_otg_notify);
 	set_notify_data(&sec_otg_notify, pdata);
 

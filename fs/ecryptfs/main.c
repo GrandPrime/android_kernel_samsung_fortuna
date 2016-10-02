@@ -39,10 +39,6 @@
 #include <linux/magic.h>
 #include "ecryptfs_kernel.h"
 
-#ifdef CONFIG_SDP
-#include "mm.h"
-#include "ecryptfs_sdp_chamber.h"
-#endif
 
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
 #include <linux/ctype.h>
@@ -173,11 +169,6 @@ void ecryptfs_put_lower_file(struct inode *inode)
 	if (atomic_dec_and_mutex_lock(&inode_info->lower_file_count,
 				      &inode_info->lower_file_mutex)) {
 		filemap_write_and_wait(inode->i_mapping);
-#ifdef CONFIG_SDP
-		if (inode_info->crypt_stat.flags & ECRYPTFS_DEK_IS_SENSITIVE) {
-			ecryptfs_mm_do_sdp_cleanup(inode);
-		}
-#endif
 		fput(inode_info->lower_file);
 		inode_info->lower_file = NULL;
 		mutex_unlock(&inode_info->lower_file_mutex);
@@ -193,13 +184,10 @@ enum { ecryptfs_opt_sig, ecryptfs_opt_ecryptfs_sig,
        ecryptfs_opt_unlink_sigs, ecryptfs_opt_mount_auth_tok_only,
        ecryptfs_opt_check_dev_ruid,
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
-       ecryptfs_opt_enable_filtering,
+	ecryptfs_opt_enable_filtering,
 #endif
 #if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
-       ecryptfs_opt_enable_cc,
-#endif
-#ifdef CONFIG_SDP
-	ecryptfs_opt_userid, ecryptfs_opt_sdp, ecryptfs_opt_chamber_dirs, ecryptfs_opt_partition_id,
+	ecryptfs_opt_enable_cc,
 #endif
        ecryptfs_opt_err };
 
@@ -223,12 +211,6 @@ static const match_table_t tokens = {
 #endif
 #if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
 	{ecryptfs_opt_enable_cc, "ecryptfs_enable_cc"},
-#endif
-#ifdef CONFIG_SDP
-	{ecryptfs_opt_chamber_dirs, "chamber=%s"},
-	{ecryptfs_opt_userid, "userid=%s"},
-    {ecryptfs_opt_sdp, "sdp_enabled"},
-    {ecryptfs_opt_partition_id, "partition_id=%u"},
 #endif
 	{ecryptfs_opt_err, NULL}
 };
@@ -269,16 +251,9 @@ static void ecryptfs_init_mount_crypt_stat(
 	INIT_LIST_HEAD(&mount_crypt_stat->global_auth_tok_list);
 	mutex_init(&mount_crypt_stat->global_auth_tok_list_mutex);
 	mount_crypt_stat->flags |= ECRYPTFS_MOUNT_CRYPT_STAT_INITIALIZED;
-
-#ifdef CONFIG_SDP
-	spin_lock_init(&mount_crypt_stat->chamber_dir_list_lock);
-	INIT_LIST_HEAD(&mount_crypt_stat->chamber_dir_list);
-
-	mount_crypt_stat->partition_id = -1;
-#endif
 }
-
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
+
 static int parse_enc_file_filter_parms(
 	struct ecryptfs_mount_crypt_stat *mcs, char *str)
 {
@@ -295,6 +270,7 @@ static int parse_enc_file_filter_parms(
 	}
 	return 0;
 }
+
 
 static int parse_enc_ext_filter_parms(
 	struct ecryptfs_mount_crypt_stat *mcs, char *str)
@@ -505,42 +481,6 @@ static int ecryptfs_parse_options(struct ecryptfs_sb_info *sbi, char *options,
 			strncpy(cipher_mode, ECRYPTFS_AES_CBC_MODE, ECRYPTFS_MAX_CIPHER_MODE_SIZE);
 			break;
 #endif
-#ifdef CONFIG_SDP
-		case ecryptfs_opt_userid: {
-			char *userid_src = args[0].from;
-			int userid =
-				(int)simple_strtol(userid_src,
-						&userid_src, 0);
-			sbi->userid = userid;
-			mount_crypt_stat->userid = userid;
-			/*
-			 * Enabling SDP by default for Knox container.
-			 */
-			mount_crypt_stat->flags |= ECRYPTFS_MOUNT_SDP_ENABLED;
-			}
-			break;
-		case ecryptfs_opt_sdp:
-			mount_crypt_stat->flags |= ECRYPTFS_MOUNT_SDP_ENABLED;
-			break;
-		case ecryptfs_opt_chamber_dirs: {
-			char *chamber_dirs = args[0].from;
-			char *token = NULL;
-
-			printk("%s : chamber dirs : %s\n", __func__, chamber_dirs);
-			while ((token = strsep(&chamber_dirs, "|")) != NULL)
-				if(!is_chamber_directory(mount_crypt_stat, token))
-					add_chamber_directory(mount_crypt_stat, token);
-		}
-		break;
-		case ecryptfs_opt_partition_id: {
-            char *partition_id_str = args[0].from;
-            mount_crypt_stat->partition_id =
-                (int)simple_strtol(partition_id_str,
-                           &partition_id_str, 0);
-            printk("%s : partition_id : %d", __func__, mount_crypt_stat->partition_id);
-		}
-		break;
-#endif
 		case ecryptfs_opt_err:
 		default:
 			printk(KERN_WARNING
@@ -628,22 +568,25 @@ static int ecryptfs_parse_options(struct ecryptfs_sb_info *sbi, char *options,
 	}
 #else
 	if (!ecryptfs_tfm_exists(mount_crypt_stat->global_default_cipher_name,
-				 NULL)) {
+				NULL)) {
+
 		rc = ecryptfs_add_new_key_tfm(
 			NULL, mount_crypt_stat->global_default_cipher_name,
 			mount_crypt_stat->global_default_cipher_key_size);
+
 		if (rc) {
 			printk(KERN_ERR "Error attempting to initialize "
-			       "cipher with name = [%s] and key size = [%td]; "
-			       "rc = [%d]\n",
-			       mount_crypt_stat->global_default_cipher_name,
-			       mount_crypt_stat->global_default_cipher_key_size,
-			       rc);
+				   "cipher with name = [%s] and key size = [%td]; "
+				   "rc = [%d]\n",
+				   mount_crypt_stat->global_default_cipher_name,
+				   mount_crypt_stat->global_default_cipher_key_size,
+				   rc);
 			rc = -EINVAL;
 			mutex_unlock(&key_tfm_list_mutex);
 			goto out;
 		}
 	}
+
 	if ((mount_crypt_stat->flags & ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES)
 	    && !ecryptfs_tfm_exists(
 		    mount_crypt_stat->global_default_fn_cipher_name, NULL)) {
@@ -699,10 +642,6 @@ static struct dentry *ecryptfs_mount(struct file_system_type *fs_type, int flags
 		rc = -ENOMEM;
 		goto out;
 	}
-
-#ifdef CONFIG_SDP
-	sbi->userid = -1;
-#endif
 
 	rc = ecryptfs_parse_options(sbi, raw_data, &check_ruid);
 	if (rc) {

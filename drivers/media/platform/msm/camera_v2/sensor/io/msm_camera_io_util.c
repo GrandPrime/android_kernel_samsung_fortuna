@@ -23,6 +23,7 @@
 
 #define BUFF_SIZE_128 128
 
+//#define CONFIG_MSMB_CAMERA_DEBUG 1
 #undef CDBG
 #ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
@@ -38,9 +39,8 @@
 #endif
 #endif
 
-#if defined(CONFIG_MACH_A5_CHN_CTC) || defined(CONFIG_MACH_A5_CHN_OPEN) || defined(CONFIG_MACH_A5_CHN_ZH) || defined(CONFIG_MACH_A5_CHN_ZT)
+#if defined(CONFIG_SEC_NOVEL_PROJECT) && defined(CONFIG_CAM_USE_GPIO_I2C)
 extern unsigned int system_rev;
-#define RESET_REV_CHECK_NUM 10
 #endif
 
 void msm_camera_io_w(u32 data, void __iomem *addr)
@@ -511,6 +511,8 @@ int msm_camera_config_single_vreg(struct device *dev,
 		if (!strncmp(cam_vreg->reg_name, "cam_vdig", 8)) {
 #if defined(CONFIG_SEC_ROSSA_PROJECT)
 			*reg_ptr = regulator_get(dev, "CAM_SENSOR_IO_1.8V");
+#elif defined(CONFIG_SEC_NOVEL_PROJECT)
+			*reg_ptr = regulator_get(dev, "CAM_SENSOR_CORE_1.8V");
 #else
 			*reg_ptr = regulator_get(dev, "CAM_SENSOR_CORE_1.2V");
 #endif
@@ -520,19 +522,17 @@ int msm_camera_config_single_vreg(struct device *dev,
 				*reg_ptr = NULL;
 				goto vreg_get_fail;
 			}
-		} 
-#ifdef CONFIG_SEC_A8_PROJECT
-				else if (!strncmp(cam_vreg->reg_name, "cam_vaf", 8)) {
-					*reg_ptr = regulator_get(dev, "CAM_SENSOR_A2.8V");
-					if (IS_ERR(*reg_ptr)) {
-						pr_err("%s: %s get failed\n", __func__,
-								cam_vreg->reg_name);
-						*reg_ptr = NULL;
-						goto vreg_get_fail;
-					}
-				}
-#else
-		else if (!strncmp(cam_vreg->reg_name, "cam_vana", 8)) {
+#if defined(CONFIG_SEC_NOVEL_PROJECT)
+		} else if (!strncmp(cam_vreg->reg_name, "cam_vana_vt", 11)) {
+			*reg_ptr = regulator_get(dev, "LDO3");
+			if (IS_ERR(*reg_ptr)) {
+				pr_err("%s: %s get failed\n", __func__,
+						cam_vreg->reg_name);
+				*reg_ptr = NULL;
+				goto vreg_get_fail;
+			}
+#endif
+		} else if (!strncmp(cam_vreg->reg_name, "cam_vana", 8)) {
 			*reg_ptr = regulator_get(dev, "CAM_SENSOR_A2.8V");
 			if (IS_ERR(*reg_ptr)) {
 				pr_err("%s: %s get failed\n", __func__,
@@ -540,9 +540,20 @@ int msm_camera_config_single_vreg(struct device *dev,
 				*reg_ptr = NULL;
 				goto vreg_get_fail;
 			}
-		}
+#if defined(CONFIG_SEC_NOVEL_PROJECT) && defined(CONFIG_CAM_USE_GPIO_I2C)
+		} else if (!strncmp(cam_vreg->reg_name, "cam_vio_vt", 10)) {
+			pr_err("[cam_vio_vt]%s:%d system_rev:%d\n", __func__, __LINE__, system_rev);
+			if(system_rev == 0) {
+				*reg_ptr = regulator_get(dev, "LDO2");
+				if (IS_ERR(*reg_ptr)) {
+					pr_err("%s: %s get failed\n", __func__,
+							cam_vreg->reg_name);
+					*reg_ptr = NULL;
+					goto vreg_get_fail;
+				}
+      }
 #endif
-		else {
+		} else {
 			*reg_ptr = regulator_get(dev, cam_vreg->reg_name);
 			if (IS_ERR_OR_NULL(*reg_ptr)) {
 				pr_err("%s: %s get failed\n", __func__,
@@ -574,12 +585,7 @@ int msm_camera_config_single_vreg(struct device *dev,
 #ifdef CONFIG_MFD_RT5033_RESET_WA
 		if (!strncmp(cam_vreg->reg_name, RT5033_RESET_WA_VREG_NAME, 8)){
 			rt_rc = regulator_get_status(*reg_ptr);
-#if defined(CONFIG_MACH_A5_CHN_CTC) || defined(CONFIG_MACH_A5_CHN_OPEN) || defined(CONFIG_MACH_A5_CHN_ZH) || defined(CONFIG_MACH_A5_CHN_ZT)
-			if ((system_rev > RESET_REV_CHECK_NUM && rt_rc==2) || rt_rc==8)
-#else
-			if((rt_rc == 2) || (rt_rc == 8))
-#endif
-			{
+			if((rt_rc == 2) || (rt_rc == 8)){
 				BUG_ON(1);
 			} else {
 				pr_err("[RT5033] result : 0x%x\n", rt_rc);

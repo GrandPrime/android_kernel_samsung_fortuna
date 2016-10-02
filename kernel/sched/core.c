@@ -4412,7 +4412,6 @@ void scheduler_tick(void)
 	trigger_load_balance(rq, cpu);
 #endif
 	rq_last_tick_reset(rq);
-
 	if (!sched_orig_load_balance_enable)
 		if (curr->sched_class == &fair_sched_class)
 			check_for_migration(rq, curr);
@@ -8867,9 +8866,6 @@ void __init sched_init(void)
 {
 	int i, j;
 	unsigned long alloc_size = 0, ptr;
-
-	sec_gaf_supply_rqinfo(offsetof(struct rq, curr),
-						  offsetof(struct cfs_rq, rq));
 
 	if (sched_enable_hmp)
 		pr_info("HMP scheduling enabled.\n");

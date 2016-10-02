@@ -172,8 +172,8 @@ rtc_irq_reg_err:
 
 #ifdef CONFIG_RTC_AUTO_PWRON
 extern int rtc_set_bootalarm(struct rtc_device *rtc, struct rtc_wkalrm *alarm);
-/* 0|1234|56|78|90|12 */
-/* 1|2010|01|01|00|00 */
+// 0|1234|56|78|90|12
+// 1|2010|01|01|00|00
 //en yyyy mm dd hh mm
 #define BOOTALM_BIT_EN       0
 #define BOOTALM_BIT_YEAR     1

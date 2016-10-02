@@ -73,10 +73,9 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	int i = 0;
 #if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-	struct mipi_panel_info *mipi = NULL;
+	struct mipi_panel_info *mipi = &pdata->panel_info.mipi;
 	struct samsung_display_driver_data *vdd = NULL;
 #endif
-
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		ret = -EINVAL;
@@ -87,7 +86,6 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 				panel_data);
 
 #if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-	mipi = &pdata->panel_info.mipi;
 	vdd = check_valid_ctrl(ctrl_pdata);
 #endif
 
@@ -96,7 +94,10 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 		pr_warn("%s: Panel reset failed. rc=%d\n", __func__, ret);
 		ret = 0;
 	}
-
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+		if (vdd->panel_func.samsung_backlight_ic_power_on)
+			vdd->panel_func.samsung_backlight_ic_power_on(0);
+#endif
 	if (mdss_dsi_pinctrl_set_state(ctrl_pdata, false))
 		pr_debug("reset disable: pinctrl not enabled\n");
 
@@ -125,24 +126,17 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 	}
 
 #if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+	if (mipi->power_off_delay)
+			usleep(mipi->power_off_delay);
 
-		if(mipi->power_off_delay)
-			udelay(mipi->power_off_delay);
-
-		if (mdss_samsung_panel_extra_power(pdata, 0))
-			pr_err("%s : failed to enable extra power\n", __func__);
+	if (mdss_samsung_panel_extra_power(pdata, 0))
+		pr_err("%s : failed to enable extra power\n", __func__);
 
 		if (vdd->dtsi_data[ctrl_pdata->ndx].backlight_gpio_config) {
 			ret = mdss_backlight_tft_gpio_config(pdata, 0);
 			if (ret)
 				pr_info("%s : failed to disable tft backlight configuration\n", __func__);
 		}
-
-		if(vdd->panel_func.samsung_ql_lvds_register_set && ctrl_pdata->lvds_clk)
-			clk_disable_unprepare(ctrl_pdata->lvds_clk);
-
-		if(vdd->dtsi_data[ctrl_pdata->ndx].blic_discharging_delay_tft)
-			usleep(vdd->dtsi_data[ctrl_pdata->ndx].blic_discharging_delay_tft);
 #endif
 
 
@@ -157,7 +151,6 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 	int i = 0;
 #if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
 	struct samsung_display_driver_data *vdd = NULL;
-	unsigned long lvds_clk;
 #endif
 
 	if (pdata == NULL) {
@@ -170,17 +163,6 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 
 #if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
 	vdd = check_valid_ctrl(ctrl_pdata);
-
-	if(vdd->panel_func.samsung_ql_lvds_register_set && ctrl_pdata->lvds_clk ){
-		ret = clk_prepare_enable(ctrl_pdata->lvds_clk);
-		if(ret < 0){
-			pr_err("%s: lvds clk prepare_ en failed joann. rc=%d\n",
-			__func__, ret);
-		}
-
-		lvds_clk = clk_get_rate(ctrl_pdata->lvds_clk);
-		pr_err("%s: lvds clk (%ld) \n",__func__,lvds_clk);
-	}
 #endif
 
 	for (i = 0; i < DSI_MAX_PM; i++) {
@@ -201,17 +183,20 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 	}
 
 #if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-		if (mdss_samsung_panel_extra_power(pdata, 1))
-			pr_err("%s : failed to enable extra power\n", __func__);
+	if (mdss_samsung_panel_extra_power(pdata, 1))
+		pr_err("%s : failed to enable extra power\n", __func__);
 
-		if(vdd->dtsi_data[ctrl_pdata->ndx].samsung_power_on_reset_delay)
+	if (vdd->panel_func.samsung_backlight_ic_power_on)
+		vdd->panel_func.samsung_backlight_ic_power_on(1);
+
+	if(vdd->dtsi_data[ctrl_pdata->ndx].samsung_power_on_reset_delay)
 			usleep(vdd->dtsi_data[ctrl_pdata->ndx].samsung_power_on_reset_delay);
 
-		if (vdd->dtsi_data[ctrl_pdata->ndx].backlight_gpio_config) {
-			ret = mdss_backlight_tft_gpio_config(pdata, 1);
-			if (ret)
-				pr_info("%s : failed to enable tft backlight configuration\n", __func__);
-		}
+	if (vdd->dtsi_data[ctrl_pdata->ndx].backlight_gpio_config) {
+		ret = mdss_backlight_tft_gpio_config(pdata, 1);
+		if (ret)
+			pr_info("%s : failed to enable tft backlight configuration\n", __func__);
+	}
 #endif
 
 	if (ctrl_pdata->panel_bias_vreg) {
@@ -231,12 +216,8 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 	 * bootloader. This needs to be done irresepective of whether
 	 * the lp11_init flag is set or not.
 	 */
-
-#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-	if ((!vdd->panel_func.samsung_lvds_write_reg && pdata->panel_info.cont_splash_enabled) || !pdata->panel_info.mipi.lp11_init) {
-#else
-	if (pdata->panel_info.cont_splash_enabled || !pdata->panel_info.mipi.lp11_init) {
-#endif
+	if (pdata->panel_info.cont_splash_enabled ||
+		!pdata->panel_info.mipi.lp11_init) {
 		if (mdss_dsi_pinctrl_set_state(ctrl_pdata, true))
 			pr_debug("reset enable: pinctrl not enabled\n");
 
@@ -624,12 +605,6 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 		return -EINVAL;
 	}
 
-
-	if (pdata->panel_info.panel_power_on) {
-		pr_warn("%s:%d Panel already on.\n", __func__, __LINE__);
-		return 0;
-	}
-
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
@@ -673,15 +648,7 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	 * clocks.
 	 */
 	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_BUS_CLKS, 1);
-
-	/*
-	 * If ULPS during suspend feature is enabled, then DSI PHY was
-	 * left on during suspend. In this case, we do not need to reset/init
-	 * PHY. This would have already been done when the BUS clocks are
-	 * turned on. However, if cont splash is disabled, the first time DSI
-	 * is powered on, phy init needs to be done unconditionally.
-	 */
-	if (!pdata->panel_info.ulps_suspend_enabled || !ctrl_pdata->ulps) {
+	if (!pdata->panel_info.ulps_suspend_enabled) {
 		mdss_dsi_phy_sw_reset(ctrl_pdata);
 		mdss_dsi_phy_init(ctrl_pdata);
 		mdss_dsi_ctrl_setup(ctrl_pdata);
@@ -701,15 +668,15 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	if (mipi->lp11_init) {
 #if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
 		if (vdd->dtsi_data[ctrl_pdata->ndx].samsung_lp11_init) {
-		/* LP11 */
+			/* LP11 */
 			reg_backup =
 				MIPI_INP((ctrl_pdata->ctrl_base) + 0xac);
 			MIPI_OUTP((ctrl_pdata->ctrl_base) + 0xac,
 					0x1F << 16);
-		wmb();
+			wmb();
 
-		if (mipi->init_delay)
-			usleep(mipi->init_delay);
+			if (mipi->init_delay)
+				usleep(mipi->init_delay);
 		}
 #endif
 		if (mdss_dsi_pinctrl_set_state(ctrl_pdata, true))
@@ -749,11 +716,14 @@ static int mdss_dsi_pinctrl_set_state(
 {
 	struct pinctrl_state *pin_state;
 	int rc = -EFAULT;
-	if(!mdss_panel_attach_get(ctrl_pdata))
-		active = false;
 
 	if (IS_ERR_OR_NULL(ctrl_pdata->pin_res.pinctrl))
 		return PTR_ERR(ctrl_pdata->pin_res.pinctrl);
+
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+	if (!mdss_panel_attach_get(ctrl_pdata))
+		active = false;
+#endif
 
 	pin_state = active ? ctrl_pdata->pin_res.gpio_state_active
 				: ctrl_pdata->pin_res.gpio_state_suspend;
@@ -920,7 +890,7 @@ static int mdss_dsi_blank(struct mdss_panel_data *pdata, int power_state)
 
 error:
 	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 0);
-	pr_debug("%s-:End\n", __func__);
+	pr_info("%s-:End\n", __func__);
 	return ret;
 }
 
@@ -1337,7 +1307,6 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 							pdata);
 		break;
 	case MDSS_EVENT_UNBLANK:
-		mdss_dsi_get_hw_revision(ctrl_pdata);
 		if (ctrl_pdata->on_cmds.link_state == DSI_LP_MODE)
 			rc = mdss_dsi_unblank(pdata);
 		break;
@@ -1399,6 +1368,9 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	case MDSS_EVENT_REGISTER_RECOVERY_HANDLER:
 		rc = mdss_dsi_register_recovery_handler(ctrl_pdata,
 			(struct mdss_intf_recovery *)arg);
+		break;
+	case MDSS_EVENT_INTF_RESTORE:
+		mdss_dsi_ctrl_phy_restore(ctrl_pdata);
 		break;
 	case MDSS_EVENT_FB_REGISTERED:
 		if (ctrl_pdata->registered) {
@@ -1631,7 +1603,6 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 	}
 
 	cmd_cfg_cont_splash = mdss_panel_get_boot_cfg() ? true : false;
-	/* TODO: remove below line if the cont_splash enabled */
 
 	rc = mdss_dsi_panel_init(dsi_pan_node, ctrl_pdata, cmd_cfg_cont_splash);
 	if (rc) {
@@ -1916,6 +1887,8 @@ int dsi_panel_device_register(struct device_node *pan_node,
 		if (!gpio_is_valid(ctrl_pdata->disp_en_gpio))
 			pr_err("%s:%d, Disp_en gpio not specified\n",
 					__func__, __LINE__);
+		else
+			pr_err("%s disp_en_gpio gpio : %d\n", __func__, ctrl_pdata->disp_en_gpio);
 	}
 
 	ctrl_pdata->disp_te_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
@@ -1924,16 +1897,6 @@ int dsi_panel_device_register(struct device_node *pan_node,
 	if (!gpio_is_valid(ctrl_pdata->disp_te_gpio))
 		pr_err("%s:%d, TE gpio not specified\n",
 						__func__, __LINE__);
-#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-	ctrl_pdata->lcd_select_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
-			 "qcom,platform-lcd-select-gpio", 0);
-
-	if (!gpio_is_valid(ctrl_pdata->lcd_select_gpio))
-		pr_err("%s:%d, lcd_select_gpio not specified\n",
-						__func__, __LINE__);
-	else pr_debug("%s:%d, lcd_select_gpio (%d)",__func__, __LINE__,ctrl_pdata->lcd_select_gpio);
-
-#endif
 
 	ctrl_pdata->bklt_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 		"qcom,platform-bklight-en-gpio", 0);
@@ -1945,6 +1908,8 @@ int dsi_panel_device_register(struct device_node *pan_node,
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio))
 		pr_err("%s:%d, reset gpio not specified\n",
 						__func__, __LINE__);
+	else
+		pr_err("%s reset gpio : %d\n", __func__, ctrl_pdata->rst_gpio);
 
 	if (pinfo->mode_gpio_state != MODE_GPIO_NOT_VALID) {
 

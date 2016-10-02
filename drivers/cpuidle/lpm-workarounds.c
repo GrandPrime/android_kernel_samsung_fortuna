@@ -47,7 +47,7 @@ static void send_dummy_cx_vote(struct work_struct *w)
  */
 void lpm_wa_cx_unvote_send(void)
 {
-	/* Checking for wq : lpm_wa_wq as it is not created when there is 
+	/* Checking for wq : lpm_wa_wq as it is not created when there is
 	a failure in getting lpm_cx_reg in lpm_wa_cx_unvote_init and thus
 	we can avoid panic inside dummy_vote_work */
 	if (lpm_wa_cx_turbo_unvote && lpm_wa_wq)

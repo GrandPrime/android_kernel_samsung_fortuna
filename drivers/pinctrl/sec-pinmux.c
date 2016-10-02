@@ -27,6 +27,8 @@
 
 #ifdef CONFIG_SEC_PM_DEBUG
 static DEFINE_SPINLOCK(gpiomux_lock);
+#else
+#error CONFIG_SEC_PM_DEBUG NOT FOUND!
 #endif
 static unsigned msm_gpiomux_ngpio;
 #ifdef CONFIG_SEC_GPIO_DVS
@@ -87,14 +89,8 @@ static void msm8916_check_gpio_status(unsigned char phonestate)
 
 	for (i = 0; i < AP_GPIO_COUNT; i++) {
 #ifdef ENABLE_SENSORS_FPRINT_SECURE
-		if (i >= CONFIG_SENSORS_FP_SPI_GPIO_START && i <= CONFIG_SENSORS_FP_SPI_GPIO_END)
+		if (i >= 23 && i <= 26)
 			continue;
-#endif
-#ifdef CONFIG_NFC_P61
-#if (defined CONFIG_SEC_A8_PROJECT) && (defined ENABLE_SENSORS_FPRINT_SECURE)
-		if (i >= 0 && i <= 3)
-			continue;
-#endif
 #endif
 		msm_tlmm_v4_get_gp_cfg(i, &val);
 		if (val.func == GPIOMUX_FUNC_GPIO) {
@@ -341,14 +337,8 @@ static void gpiomux_debug_print(struct seq_file *m)
 
 	for (gpio = begin; gpio < msm_gpiomux_ngpio; ++gpio) {
 #ifdef ENABLE_SENSORS_FPRINT_SECURE
-		if (gpio >= CONFIG_SENSORS_FP_SPI_GPIO_START && gpio <= CONFIG_SENSORS_FP_SPI_GPIO_END)
+		if (gpio >= 23 && gpio <= 26)
 			continue;
-#endif
-#ifdef CONFIG_NFC_P61
-#if (defined CONFIG_SEC_A8_PROJECT) && (defined ENABLE_SENSORS_FPRINT_SECURE)
-		if (gpio >= 0 && gpio <= 3)
-			continue;
-#endif
 #endif
 		msm_tlmm_v4_get_gp_cfg(gpio, &set);
 		if (set.dir) {

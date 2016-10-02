@@ -272,9 +272,8 @@ static bool __ref msm_pm_spm_power_collapse(
 			cpu, __func__, entry);
 
 	msm_jtag_save_state();
-
 #ifdef CONFIG_SEC_DEBUG
-        secdbg_sched_msg("+pc(I:%d,R:%d)", from_idle, notify_rpm);
+	secdbg_sched_msg("+pc(I:%d,R:%d)", from_idle, notify_rpm);
 #endif
 
 #ifdef CONFIG_CPU_V7
@@ -286,7 +285,7 @@ static bool __ref msm_pm_spm_power_collapse(
 #endif
 
 #ifdef CONFIG_SEC_DEBUG
-        secdbg_sched_msg("-pc(%d)", collapsed);
+	secdbg_sched_msg("-pc(%d)", collapsed);
 #endif
 
 	msm_jtag_restore_state();
@@ -904,7 +903,7 @@ static int __init msm_pm_drv_init(void)
 	if (rc)
 		pr_err("%s(): failed to register driver %s\n", __func__,
 				msm_cpu_pm_snoc_client_driver.driver.name);
-	return rc;
+		return rc;
 }
 late_initcall(msm_pm_drv_init);
 

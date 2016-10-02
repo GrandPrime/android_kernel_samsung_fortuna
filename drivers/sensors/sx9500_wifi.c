@@ -33,7 +33,7 @@
 #define VENDOR_NAME              "SEMTECH"
 #define MODEL_NAME               "SX9500_WIFI"
 #define MODULE_NAME              "grip_sensor_wifi"
-#define CALIBRATION_FILE_PATH    "/efs/FactoryApp/grip_wifi_cal_data"
+#define CALIBRATION_FILE_PATH    "/efs/grip_wifi_cal_data"
 
 #define I2C_M_WR                 0 /* for i2c Write */
 #define I2c_M_RD                 1 /* for i2c Read */
@@ -109,33 +109,6 @@ struct sx9500_p {
 #endif
 	atomic_t enable;
 };
-
-#ifdef CONFIG_SENSORS_SX9500_WIFI_DEFENCE_CODE_FOR_TA_NOISE
-#include <linux/power_supply.h>
-#if defined(CONFIG_SEC_GT510_PROJECT)
-#define SX9500_NORMAL_TOUCH_CABLE_THRESHOLD	21
-#else
-#define SX9500_NORMAL_TOUCH_CABLE_THRESHOLD	28
-#endif
-
-static int check_ta_state(void)
-{
-	static struct power_supply *psy = NULL;
-	union power_supply_propval ret = {0,};
-
-	if (psy == NULL) {
-		psy = power_supply_get_by_name("battery");
-		if (psy == NULL) {
-			pr_err("[SX9500_WIFI]: failed to get ps battery\n");
-			return -EINVAL;
-		}
-	}
-
-	psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &ret);
-
-	return ret.intval;
-}
-#endif
 
 static int sx9500_get_nirq_state(struct sx9500_p *data)
 {
@@ -244,13 +217,6 @@ static int sx9500_set_offset_calibration(struct sx9500_p *data)
 static void send_event(struct sx9500_p *data, u8 state)
 {
 	u8 buf = data->touchTh;
-
-#ifdef CONFIG_SENSORS_SX9500_WIFI_DEFENCE_CODE_FOR_TA_NOISE
-	if (check_ta_state() > 1) {
-		buf = SX9500_NORMAL_TOUCH_CABLE_THRESHOLD;
-		pr_info("[SX9500_WIFI]: %s - TA cable connected\n", __func__);
-	}
-#endif
 
 	if (state == ACTIVE) {
 		data->state = ACTIVE;
@@ -1002,7 +968,7 @@ static void sx9500_touch_process(struct sx9500_p *data, u8 flag)
 			if (status & (CSX_STATUS_REG << MAIN_SENSOR))
 				pr_info("[SX9500_WIFI]: %s - still touched.\n",
 					__func__);
-			else if (capMain <= threshold + 300)
+			else if (capMain <= threshold)
 				send_event(data, IDLE);
 			else
 				pr_info("[SX9500_WIFI]: %s - still touched.\n",

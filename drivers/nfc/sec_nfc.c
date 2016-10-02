@@ -89,7 +89,7 @@ struct sec_nfc_info {
 	struct device *dev;
 	struct sec_nfc_platform_data *pdata;
 	struct sec_nfc_i2c_info i2c_info;
-#ifdef CONFIG_SEC_NFC_CLK_REQ
+#if defined(CONFIG_SEC_NFC_CLK_REQ) || defined(CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE)
 	bool clk_ctl;
 	bool clk_state;
 #endif
@@ -495,13 +495,32 @@ static void sec_nfc_set_mode(struct sec_nfc_info *info,
 		msleep(SEC_NFC_VEN_WAIT_TIME);
 		gpio_set_value_cansleep(pdata->ven, 1);
 		gpio_set_value(pdata->ven, SEC_NFC_PW_ON);
+#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
+		if(!info->clk_state){
+			pr_info("[NFC] %s :NFC-ON clk_prepare_enable \n", __func__);
+			clk_prepare_enable(pdata->nfc_clk);
+			info->clk_state = true;
+			info->clk_ctl = true;
+		}
+#else
 		sec_nfc_clk_ctl_enable(info);
+#endif
 		msleep(SEC_NFC_VEN_WAIT_TIME/2);
 #ifdef CONFIG_SEC_NFC_IF_I2C
 		enable_irq_wake(info->i2c_info.i2c_dev->irq);
 #endif
 	} else {
+#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
+		if(info->clk_state){
+			pr_info("[NFC] %s :NFC-OFF clk_disable_unprepare \n", __func__);
+			clk_disable_unprepare(pdata->nfc_clk);
+			info->clk_state = false;
+			info->clk_ctl = false;
+		}
+#else
 		sec_nfc_clk_ctl_disable(info);
+#endif
+
 #ifdef CONFIG_SEC_NFC_IF_I2C
 		disable_irq_wake(info->i2c_info.i2c_dev->irq);
 #endif
@@ -630,8 +649,20 @@ static const struct file_operations sec_nfc_fops = {
 static int sec_nfc_suspend(struct device *dev)
 {
 	struct sec_nfc_info *info = SEC_NFC_GET_INFO(dev);
+#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
+	struct sec_nfc_platform_data *pdata = info->pdata;
+#endif
 	int ret = 0;
 
+	dev_dbg(info->dev, "%s\n", __func__);
+	pr_info("[NFC] %s\n", __func__);
+#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
+	if (info->clk_state){
+		pr_info("[NFC] %s : clk_disable_unprepare \n", __func__);
+		clk_disable_unprepare(pdata->nfc_clk);
+		info->clk_state = false;
+	}
+#endif
 	mutex_lock(&info->mutex);
 
 	if (info->mode == SEC_NFC_MODE_BOOTLOADER)
@@ -644,6 +675,22 @@ static int sec_nfc_suspend(struct device *dev)
 
 static int sec_nfc_resume(struct device *dev)
 {
+#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
+	struct sec_nfc_info *info = SEC_NFC_GET_INFO(dev);
+	struct sec_nfc_platform_data *pdata = info->pdata;
+
+	dev_dbg(info->dev, "%s\n", __func__);
+	pr_info("[NFC] %s\n", __func__);
+	if (!info->clk_ctl){
+		pr_info("[NFC] %s : Clock is off during NFC-OFF \n", __func__);
+		return 0;
+	}
+	if(!info->clk_state){
+		pr_info("[NFC] %s : clk_prepare_enable \n", __func__);
+		clk_prepare_enable(pdata->nfc_clk);
+		info->clk_state = true;
+	}
+#endif
 	return 0;
 }
 
@@ -686,11 +733,17 @@ static int sec_nfc_parse_dt(struct device *dev,
 	if (IS_ERR(pdata->nfc_clk)) {
 		pr_err("[NFC] %s: Couldn't get D1)\n",
 					__func__);
-	} else {
+	}
+#ifndef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
+	else {
 		if (clk_prepare_enable(pdata->nfc_clk))
 			pr_err("[NFC] %s: Couldn't prepare D1\n",
 					__func__);
 	}
+#endif
+#endif
+#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
+	clk_disable_unprepare(pdata->nfc_clk);
 #endif
 	pr_info("%s : ven-gpio\t= %d\n", __func__, pdata->ven);
 	pr_info("%s : firm-gpio\t= %d\n", __func__, pdata->firm);
@@ -800,6 +853,11 @@ static int __sec_nfc_probe(struct device *dev)
 
 	mutex_init(&info->mutex);
 	dev_set_drvdata(dev, info);
+
+#ifdef CONFIG_SEC_NFC_CLK_ALWAYS_ENABLE
+	info->clk_state = false;
+	info->clk_ctl = false;
+#endif
 
 	info->miscdev.minor = MISC_DYNAMIC_MINOR;
 	info->miscdev.name = SEC_NFC_DRIVER_NAME;

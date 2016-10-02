@@ -841,12 +841,8 @@ static void qseecom_bw_inactive_req_work(struct work_struct *work)
 {
 	mutex_lock(&app_access_lock);
 	mutex_lock(&qsee_bw_mutex);
-//	__qseecom_set_msm_bus_request(INACTIVE);
-       if (qseecom.timer_running) {
+	if (qseecom.timer_running)
 		__qseecom_set_msm_bus_request(INACTIVE);
-	}       else {
-		pr_debug("QMCK: timer_running is false");
-	}
 	pr_debug("current_mode = %d, cumulative_mode = %d\n",
 				qseecom.current_mode, qseecom.cumulative_mode);
 	qseecom.timer_running = false;
@@ -3446,14 +3442,8 @@ exit_disable_clock:
 
 exit_register_bus_bandwidth_needs:
 	if (qseecom.support_bus_scaling) {
-		int ret2;
 		mutex_lock(&qsee_bw_mutex);
-		ret2 = qseecom_unregister_bus_bandwidth_needs(data);
-		pr_info("qseecom_unregister_bus_bandwidth_needs returned %d (ret=%d)\n", ret2, ret); // for debug
-		if (ret2) {
-			pr_err("qseecom_unregister_bus_bandwidth_needs returned %d\n", ret2);
-			ret = (ret || ret2);
-		}
+		ret = qseecom_unregister_bus_bandwidth_needs(data);
 		mutex_unlock(&qsee_bw_mutex);
 	}
 
@@ -5615,7 +5605,6 @@ static int qseecom_suspend(struct platform_device *pdev, pm_message_t state)
 
 	mutex_unlock(&clk_access_lock);
 	mutex_unlock(&qsee_bw_mutex);
-
 	cancel_work_sync(&qseecom.bw_inactive_req_ws);
 
 	return 0;

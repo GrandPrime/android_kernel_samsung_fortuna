@@ -88,11 +88,6 @@
 #define SM5703_OTGCURRENT               0x03
 #define SM5703_OTGCURRENT_MASK          0x03
 
-#define SM5703_OTGCURRENT_0P5A          0x00
-#define SM5703_OTGCURRENT_0P7A          0x01
-#define SM5703_OTGCURRENT_0P9A          0x02
-#define SM5703_OTGCURRENT_1P2A          0x03
-
 #define SM5703_FREQSEL_3MHZ             0x0
 #define SM5703_FREQSEL_2P4MHZ           0x1
 #define SM5703_FREQSEL_1P5MHZ           0x2
@@ -102,17 +97,6 @@
 #define SM5703_BST_IQ3LIMIT_1X          0x1
 #define SM5703_BST_IQ3LIMIT_MASK            0x80
 #define SM5703_BST_IQ3LIMIT_SHIFT           0x7
-
-#define REDUCE_CURRENT_STEP				100
-#define MINIMUM_INPUT_CURRENT			300
-
-#if defined(CONFIG_MACH_GTEL_USA_VZW)
-#define SLOW_CHARGING_CURRENT_STANDARD	400
-#else
-#define SLOW_CHARGING_CURRENT_STANDARD	999
-#endif
-
-#define SIOP_INPUT_LIMIT_CURRENT		1200
 
 extern sec_battery_platform_data_t sec_battery_pdata;
 

@@ -63,6 +63,7 @@ config QPNP_RESIN
 	  It supports reporting the change in status of the RESIN line
 	  (connected to the volume down key).
 
+
 config QPNP_CLKDIV
 	tristate "QPNP PMIC clkdiv driver"
 	depends on OF_SPMI && SPMI
@@ -246,9 +247,9 @@ config QPNP_HAPTIC
 	  on the Qualcomm Technologies' QPNP PMICs. It uses the android
 	  timed-output framework.
 
-config SEEMP_CORE
-	tristate "SEEMP Core"
+config QMP_CORE
+	tristate "QMP Core"
 	help
-		This option enables malware protection component
+		This option enables Qualcomm Malware Protection Sphinx component
 		to log on-device software API activity.
 endmenu

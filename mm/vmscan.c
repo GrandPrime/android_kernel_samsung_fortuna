@@ -44,6 +44,7 @@
 #include <linux/oom.h>
 #include <linux/prefetch.h>
 #include <linux/debugfs.h>
+#include <linux/fs.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -1125,7 +1126,7 @@ cull_mlocked:
 
 activate_locked:
 		/* Not a candidate for swapping, so reclaim swap space. */
-		if (PageSwapCache(page) && vm_swap_full(page_swap_info(page)))
+		if (PageSwapCache(page) && vm_swap_full())
 			try_to_free_swap(page);
 		VM_BUG_ON(PageActive(page));
 		SetPageActive(page);
@@ -1368,6 +1369,17 @@ static int __too_many_isolated(struct zone *zone, int file,
 {
 	unsigned long inactive, isolated;
 
+#ifdef CONFIG_RUNTIME_COMPCACHE
+	if (get_rtcc_status() == 1)
+		return 0;
+#endif /* CONFIG_RUNTIME_COMPCACHE */
+
+	if (current_is_kswapd())
+		return 0;
+
+	if (!global_reclaim(sc))
+		return 0;
+
 	if (file) {
 		if (safe) {
 			inactive = zone_page_state_snapshot(zone,
@@ -1411,11 +1423,6 @@ static int __too_many_isolated(struct zone *zone, int file,
 static int too_many_isolated(struct zone *zone, int file,
 		struct scan_control *sc, int safe)
 {
-#ifdef CONFIG_RUNTIME_COMPCACHE
-	if (get_rtcc_status() == 1)
-		return 0;
-#endif /* CONFIG_RUNTIME_COMPCACHE */
-
 	if (current_is_kswapd())
 		return 0;
 
@@ -2137,9 +2144,6 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
 		if (rtcc_reclaim(sc)) {
 			if (rc->nr_swapped >= rc->nr_anon)
 				nr[LRU_INACTIVE_ANON] = nr[LRU_ACTIVE_ANON] = 0;
-
-			if ((sc->nr_reclaimed + nr_reclaimed - rc->nr_swapped) >= rc->nr_file)
-				nr[LRU_INACTIVE_FILE] = nr[LRU_ACTIVE_FILE] = 0;
 		}
 #endif /* CONFIG_RUNTIME_COMPCACHE */
 
@@ -3100,11 +3104,7 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 		.gfp_mask = GFP_KERNEL,
 		.priority = DEF_PRIORITY,
 		.may_unmap = 1,
-#ifndef CONFIG_KSWAPD_NOSWAP
 		.may_swap = 1,
-#else
-		.may_swap = 0,
-#endif /* CONFIG_KSWAPD_NOSWAP */
 		.may_writepage = !laptop_mode,
 		.order = order,
 		.swappiness = vm_swappiness,
@@ -3308,11 +3308,12 @@ static void kswapd_try_to_sleep(pg_data_t *pgdat, int order, int classzone_idx)
 	 * go fully to sleep until explicitly woken up.
 	 */
 	if (prepare_kswapd_sleep(pgdat, order, remaining, classzone_idx)) {
-		trace_mm_vmscan_kswapd_sleep(pgdat->node_id);
 
 #ifdef CONFIG_RUNTIME_COMPCACHE
 		atomic_set(&kswapd_running, 0);
 #endif /* CONFIG_RUNTIME_COMPCACHE */
+
+		trace_mm_vmscan_kswapd_sleep(pgdat->node_id);
 
 		/*
 		 * vmstat counters are not perfectly accurate and the estimated

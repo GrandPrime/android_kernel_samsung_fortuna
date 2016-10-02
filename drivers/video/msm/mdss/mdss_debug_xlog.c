@@ -11,8 +11,6 @@
  *
  */
 
-#define __DLOG_IMPLEMENTAION_MODULE__
-
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <linux/ktime.h>
@@ -144,6 +142,11 @@ void mdss_xlog_dump(void)
 	if (!mdd->logd.xlog_enable)
 		return;
 
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+	/* To block mdss_xlog() function */
+	mdd->logd.xlog_enable = false;
+#endif
+
 	spin_lock_irqsave(&mdss_dbg_xlog.xlock, flags);
 	i = mdss_dbg_xlog.first;
 	for (n = 0; n < MDSS_XLOG_ENTRY; n++) {
@@ -221,7 +224,6 @@ void mdss_xlog_tout_handler(const char *name, ...)
 	mdss_xlog_dump();
 
 #if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-	mdss_dsi_check_te();
 	mdss_samsung_dump_regs();
 
 	if (dsi0_addr)

@@ -78,7 +78,7 @@
 #define IST30XX                 (1)
 #define IST30XXB                (2)
 
-#if defined(CONFIG_SEC_ROSSA_PROJECT) || defined(CONFIG_SEC_J1_PROJECT)
+#if defined(CONFIG_SEC_ROSSA_PROJECT)
 #define SUPPORTED_TOUCH_KEY_LED (0)
 #else
 #define SUPPORTED_TOUCH_KEY_LED (1)
@@ -136,8 +136,7 @@
 #define DVFS_STAGE_SINGLE		1
 #define DVFS_STAGE_NONE		0
 #define TOUCH_BOOSTER_OFF_TIME	300
-#define TOUCH_BOOSTER_CHG_TIME  200
-#define SECOND_MINLOCK_FOR_LEVEL1
+#define TOUCH_BOOSTER_CHG_TIME	200
 #endif
 
 enum ist30xx_commands {
@@ -361,4 +360,5 @@ int ist30xx_init_system(void);
 #if IST30XX_CHECK_BATT_TEMP
 int ist30xx_get_battery_temp(void);
 #endif
+
 #endif  // __IST30XX_H__

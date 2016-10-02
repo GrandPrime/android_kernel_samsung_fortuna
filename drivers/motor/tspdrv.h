@@ -93,41 +93,23 @@ typedef struct {
 #define VIBRATION_ON            1
 #define VIBRATION_OFF           0
 
+extern struct class *sec_class;
 int32_t g_nforce_32;
 
-#if defined(CONFIG_SEC_GT510_PROJECT)
-#define MOTOR_STRENGTH			98	/*MOTOR_STRENGTH 98 %*/
-#elif defined(CONFIG_MACH_FORTUNA_TMO)
-#define MOTOR_STRENGTH			98	/*MOTOR_STRENGTH 98 %*/
-#elif defined(CONFIG_MACH_A8_CHN_OPEN)
-#define MOTOR_STRENGTH			84	/*MOTOR_STRENGTH 84 %*/
+#if defined(CONFIG_SEC_A33G_EUR_PROJECT)
+#define MOTOR_STRENGTH				92	/* MOTOR_STRENGTH 92 % */
+#elif defined(CONFIG_MACH_A3_CHN_CTC)
+#define MOTOR_STRENGTH				85	/* MOTOR_STRENGTH 85 % */
 #else
-#define MOTOR_STRENGTH			98	/*MOTOR_STRENGTH 98 %*/
+#define MOTOR_STRENGTH				90	/* MOTOR_STRENGTH 90 % */
 #endif
 
-#if defined(CONFIG_SEC_GT510_PROJECT)
-#define GP_CLK_M_DEFAULT			3
-#define GP_CLK_N_DEFAULT                        140
-#define GP_CLK_D_DEFAULT			70  /* 50% duty cycle */
-#define IMM_PWM_MULTIPLIER			140
-#elif defined(CONFIG_MACH_FORTUNA_TMO)
-#define GP_CLK_M_DEFAULT			3
-#define GP_CLK_N_DEFAULT                        138
-#define GP_CLK_D_DEFAULT			69  /* 50% duty cycle */
-#define IMM_PWM_MULTIPLIER			138
-#elif defined(CONFIG_MACH_A8_CHN_OPEN)
 #define GP_CLK_M_DEFAULT			3
 #define GP_CLK_N_DEFAULT                        121
-#define GP_CLK_D_DEFAULT			61  /* 50% duty cycle */
+#define GP_CLK_D_DEFAULT			61	/* 50% duty cycle */
 #define IMM_PWM_MULTIPLIER			121
-#else
-#define GP_CLK_M_DEFAULT			3
-#define GP_CLK_N_DEFAULT                        121
-#define GP_CLK_D_DEFAULT			61  /* 50% duty cycle */
-#define IMM_PWM_MULTIPLIER			121
-#endif
 
-#define MOTOR_MIN_STRENGTH			54/*IMMERSION VALUE*/
+#define MOTOR_MIN_STRENGTH			54	/*IMMERSION VALUE*/
 /*
  * ** Global variables for LRA PWM M,N and D values.
  * */

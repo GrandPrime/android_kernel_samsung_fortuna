@@ -30,9 +30,6 @@ static int table_size;
 #if defined(CONFIG_SR200PC20)
 #include "sr200pc20.h"
 #endif
-#if defined(CONFIG_S5K4ECGX)
-#include "s5k4ecgx.h"
-#endif
 
 /* Logging macro */
 //#define MSM_SENSOR_DRIVER_DEBUG
@@ -45,8 +42,8 @@ static int table_size;
 
 #define SENSOR_MAX_MOUNTANGLE (360)
 
-#ifdef CONFIG_CAM_DISABLE_LPM_MODE
-extern int poweroff_charging;
+#if defined(CONFIG_SEC_NOVEL_PROJECT) && defined(CONFIG_CAM_USE_GPIO_I2C)
+extern unsigned int system_rev;
 #endif
 
 /* Static declaration */
@@ -61,13 +58,14 @@ static struct msm_sensor_fn_t sr200pc20_sensor_func_tbl = {
 	.sensor_native_control = sr200pc20_sensor_native_control,
 };
 #endif
-#if defined(CONFIG_S5K4ECGX)
-static struct msm_sensor_fn_t s5k4ecgx_sensor_func_tbl = {
-	.sensor_config = s5k4ecgx_sensor_config,
+
+#if defined(CONFIG_FLED_LM3632)
+static struct msm_sensor_fn_t front_flash_func_tbl = {
+	.sensor_config = msm_sensor_config,
 	.sensor_power_up = msm_sensor_power_up,
 	.sensor_power_down = msm_sensor_power_down,
-	.sensor_match_id = s5k4ecgx_sensor_match_id,
-	.sensor_native_control = s5k4ecgx_sensor_native_control,
+	.sensor_match_id = msm_sensor_match_id,
+	.sensor_native_control = msm_sensor_flash_native_control,
 };
 #endif
 
@@ -396,15 +394,15 @@ int32_t msm_sensor_driver_probe(void *setting)
 	}
 
 	/* Print slave info */
-	CDBG("camera id %d", slave_info->camera_id);
-	CDBG("slave_addr 0x%x", slave_info->slave_addr);
-	CDBG("addr_type %d", slave_info->addr_type);
-	CDBG("sensor_id_reg_addr 0x%x",
+	CDBG("camera id %d, ", slave_info->camera_id);
+	CDBG("slave_addr 0x%x, ", slave_info->slave_addr);
+	CDBG("addr_type %d, ", slave_info->addr_type);
+	CDBG("sensor_id_reg_addr 0x%x, ",
 		slave_info->sensor_id_info.sensor_id_reg_addr);
-	CDBG("sensor_id 0x%x", slave_info->sensor_id_info.sensor_id);
-	CDBG("size %d", slave_info->power_setting_array.size);
-	CDBG("size down %d", slave_info->power_setting_array.size_down);
-	CDBG("sensor_name %s", slave_info->sensor_name);
+	CDBG("sensor_id 0x%x, ", slave_info->sensor_id_info.sensor_id);
+	CDBG("size %d, ", slave_info->power_setting_array.size);
+	CDBG("size down %d, ", slave_info->power_setting_array.size_down);
+	CDBG("sensor_name %s, ", slave_info->sensor_name);
 
 	if (slave_info->is_init_params_valid) {
 		CDBG("position %d",
@@ -433,10 +431,9 @@ int32_t msm_sensor_driver_probe(void *setting)
 	if(slave_info->camera_id == CAMERA_2){
 		s_ctrl->func_tbl = &sr200pc20_sensor_func_tbl ;
 	}
-#endif
-#if defined(CONFIG_S5K4ECGX)
-	if (slave_info->camera_id == CAMERA_0){
-		s_ctrl->func_tbl = &s5k4ecgx_sensor_func_tbl;
+#elif defined(CONFIG_FLED_LM3632)
+	if(slave_info->camera_id == CAMERA_1){
+		s_ctrl->func_tbl = &front_flash_func_tbl ;
 	}
 #endif
 
@@ -645,6 +642,34 @@ int32_t msm_sensor_driver_probe(void *setting)
 	 * node is created and used by HAL
 	 */
 
+#if defined(CONFIG_SEC_NOVEL_PROJECT) && defined(CONFIG_CAM_USE_GPIO_I2C)
+  pr_err("[Probe]%s:%d system_rev:%d\n", __func__, __LINE__, system_rev);
+  if(system_rev == 0) {
+  	if(slave_info->camera_id == CAMERA_1){
+		  s_ctrl->sensor_device_type = MSM_CAMERA_I2C_DEVICE;
+	  	rc = msm_sensor_driver_create_i2c_v4l_subdev(s_ctrl);	//kidggang
+  	} else {
+  		if (s_ctrl->sensor_device_type == MSM_CAMERA_PLATFORM_DEVICE) {
+	  		rc = msm_sensor_driver_create_v4l_subdev(s_ctrl);
+  		} else {
+		  	rc = msm_sensor_driver_create_i2c_v4l_subdev(s_ctrl);
+	  	}
+  	}
+	  if (rc < 0) {
+  		pr_err("failed: camera creat v4l2 rc %d", rc);
+		  goto CAMERA_POWER_DOWN;
+	  }
+  } else {
+  	if (s_ctrl->sensor_device_type == MSM_CAMERA_PLATFORM_DEVICE)
+	  	rc = msm_sensor_driver_create_v4l_subdev(s_ctrl);
+	  else
+  		rc = msm_sensor_driver_create_i2c_v4l_subdev(s_ctrl);
+	  if (rc < 0) {
+  		pr_err("failed: camera creat v4l2 rc %d", rc);
+		  goto CAMERA_POWER_DOWN;
+	  }
+  }
+#else
 	if (s_ctrl->sensor_device_type == MSM_CAMERA_PLATFORM_DEVICE)
 		rc = msm_sensor_driver_create_v4l_subdev(s_ctrl);
 	else
@@ -653,6 +678,7 @@ int32_t msm_sensor_driver_probe(void *setting)
 		pr_err("failed: camera creat v4l2 rc %d", rc);
 		goto CAMERA_POWER_DOWN;
 	}
+#endif
 
 	memcpy(slave_info->subdev_name, s_ctrl->msm_sd.sd.entity.name,
 		sizeof(slave_info->subdev_name));
@@ -1084,18 +1110,17 @@ static int __init msm_sensor_driver_init(void)
 	int32_t rc = 0;
 
 	CDBG("Enter");
-
-#ifdef CONFIG_CAM_DISABLE_LPM_MODE
-	if(poweroff_charging) {
-		pr_err("%s : Camera is not probed in LPM mode", __func__);
-		return 0;
-	}
-#endif
-
 	rc = platform_driver_probe(&msm_sensor_platform_driver,
 		msm_sensor_driver_platform_probe);
 	if (!rc) {
 		CDBG("probe success");
+
+#if defined(CONFIG_SEC_NOVEL_PROJECT) && defined(CONFIG_CAM_USE_GPIO_I2C)
+		pr_err("[msm_sensor_driver_init]%s:%d system_rev:%d\n", __func__, __LINE__, system_rev);
+		if(system_rev == 0) {
+			rc = i2c_add_driver(&msm_sensor_driver_i2c);
+		}
+#endif
 		return rc;
 	} else {
 		CDBG("probe i2c");

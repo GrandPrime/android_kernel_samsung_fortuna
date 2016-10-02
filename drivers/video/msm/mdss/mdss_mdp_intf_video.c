@@ -177,7 +177,8 @@ static void mdss_mdp_video_intf_recovery(void *data, int event)
 		pr_err("Unable to calculate clock period\n");
 		return;
 	}
-	min_ln_cnt = pinfo->lcdc.v_back_porch + pinfo->lcdc.v_pulse_width;
+	min_ln_cnt = pinfo->lcdc.v_back_porch + pinfo->lcdc.v_front_porch
+						  + pinfo->lcdc.v_pulse_width;
 	active_lns_cnt = pinfo->yres;
 	time_of_line = (pinfo->lcdc.h_back_porch +
 		 pinfo->lcdc.h_front_porch +
@@ -185,8 +186,7 @@ static void mdss_mdp_video_intf_recovery(void *data, int event)
 		 pinfo->xres) * clk_period;
 
 	/* delay in micro seconds */
-	delay = (time_of_line * (min_ln_cnt +
-			pinfo->lcdc.v_front_porch)) / 1000000;
+	delay = (time_of_line * min_ln_cnt) / 1000000;
 
 	/*
 	 * Wait for max delay before
@@ -195,22 +195,17 @@ static void mdss_mdp_video_intf_recovery(void *data, int event)
 	if (delay > POLL_TIME_USEC_FOR_LN_CNT)
 		delay = POLL_TIME_USEC_FOR_LN_CNT;
 
-	mutex_lock(&ctl->offlock);
 	while (1) {
-		if (!ctl || ctl->mfd->shutdown_pending || !ctx ||
-				!ctx->timegen_en) {
-			pr_warn("Target is in suspend or shutdown pending\n");
-			mutex_unlock(&ctl->offlock);
+		if (!ctl || !ctx || !ctx->timegen_en) {
+			pr_warn("Target is in suspend state\n");
 			return;
 		}
 
 		line_cnt = mdss_mdp_video_line_count(ctl);
 
-		if ((line_cnt >= min_ln_cnt) && (line_cnt <
-			(active_lns_cnt + min_ln_cnt))) {
+		if ((line_cnt >= min_ln_cnt) && (line_cnt < active_lns_cnt)) {
 			pr_debug("%s, Needed lines left line_cnt=%d\n",
 						__func__, line_cnt);
-			mutex_unlock(&ctl->offlock);
 			return;
 		} else {
 			pr_warn("line count is less. line_cnt = %d\n",

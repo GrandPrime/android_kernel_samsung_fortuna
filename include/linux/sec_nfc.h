@@ -57,9 +57,6 @@ struct sec_nfc_platform_data {
 	unsigned int wake;
 	unsigned int tvdd;
 	unsigned int avdd;
-#ifdef CONFIG_SEC_NFC_IO_EN
-	unsigned int pvdd;
-#endif
 #ifdef CONFIG_SEC_NFC_CLK_REQ
 	unsigned int clk_req;
 	unsigned int clk_irq;
@@ -77,9 +74,6 @@ struct sec_nfc_platform_data {
 	u32 ven_gpio_flags;
 	u32 firm_gpio_flags;
 	u32 irq_gpio_flags;
-#ifdef CONFIG_SEC_NFC_IO_EN
-	u32 pvdd_gpio_flags;
-#endif
 };
 
 enum sec_nfc_mode {
@@ -111,10 +105,3 @@ enum sec_nfc_wake {
 	SEC_NFC_WAKE_SLEEP = 0,
 	SEC_NFC_WAKE_UP,
 };
-#ifdef CONFIG_SEC_NFC_IO_EN
-enum sec_nfc_pvddpin
-{
-	SEC_NFC_PVDD_OFF = 0,
-	SEC_NFC_PVDD_ON,
-};
-#endif

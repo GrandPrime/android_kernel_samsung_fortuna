@@ -437,9 +437,9 @@ static int _disp_log_stats(struct tzdbg_log_t *log,
 			return 0;
 		}
 
-                retry--;
-                if (!retry)
-                        return 0;
+		retry--;
+		if (!retry)
+			return 0;
 
 		if (buf_idx == TZDBG_LOG)
 			memcpy_fromio((void *)tzdbg.diag_buf, tzdbg.virt_iobase,

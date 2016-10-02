@@ -58,8 +58,8 @@
 		};
 
 		blsp1_uart1_active {
-			qcom,pins = <&gp 0>, <&gp 1>, <&gp 2>, <&gp 3>;
-			qcom,num-grp-pins = <4>;
+			qcom,pins = <&gp 2>, <&gp 3>;
+			qcom,num-grp-pins = <2>;
 			qcom,pin-func = <2>;
 		        label = "blsp1_uart1_active";
 
@@ -70,8 +70,8 @@
 		};
 
 		blsp1_uart1_sleep {
-			qcom,pins = <&gp 0>, <&gp 1>, <&gp 2>, <&gp 3>;
-			qcom,num-grp-pins = <4>;
+			qcom,pins = <&gp 2>, <&gp 3>;
+			qcom,num-grp-pins = <2>;
 			qcom,pin-func = <0>;
 		        label = "blsp1_uart1_sleep";
 
@@ -225,7 +225,7 @@
 			label = "spi0-cs0-active";
 			spi0_cs0_active: cs0_active {
 				drive-strength = <2>;
-				bias-disable = <0>;
+				bias-pull-down;
 			};
 		};
 
@@ -238,13 +238,13 @@
 			label = "spi0-cs0-suspend";
 			spi0_cs0_sleep: cs0_sleep {
 				drive-strength = <2>;
-				bias-disable = <0>;
+				bias-pull-down;
 			};
 		};
 
 		ice40-spi-usb-pins {
-			qcom,pins = <&gp 0>, <&gp 1>, <&gp 3>, <&gp 114>;
-			qcom,num-grp-pins = <4>;
+			qcom,pins = <&gp 3>, <&gp 114>;
+			qcom,num-grp-pins = <2>;
 			qcom,pin-func = <0>;
 			label = "ice40-spi-usb-pins";
 
@@ -1116,9 +1116,9 @@
 		};
 
 		tlmm_gpio_key {
-			qcom,pins = <&gp 107>, <&gp 108>;
+			qcom,pins = <&gp 107>;
 			qcom,pin-func = <0>;
-			qcom,num-grp-pins = <2>;
+			qcom,num-grp-pins = <1>;
 			label = "tlmm_gpio_key";
 			gpio_key_active: gpio_key_active {
 				drive-strength = <2>;

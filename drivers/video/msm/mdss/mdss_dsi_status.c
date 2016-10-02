@@ -33,9 +33,6 @@
 #define STATUS_CHECK_INTERVAL_MS 5000
 #define STATUS_CHECK_INTERVAL_MIN_MS 50
 #define DSI_STATUS_CHECK_DISABLE 0
-#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-#define STATUS_CHECK_INTERVAL_MS_FOR_IRQ 500
-#endif
 
 static uint32_t interval = STATUS_CHECK_INTERVAL_MS;
 static uint32_t dsi_status_disable = DSI_STATUS_CHECK_DISABLE;
@@ -162,9 +159,8 @@ static int fb_event_callback(struct notifier_block *self,
 		switch (*blank) {
 		case FB_BLANK_UNBLANK:
 #if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
-		if (!ctrl_pdata->status_mode == ESD_REG_IRQ)
+			if (!ctrl_pdata->status_mode == ESD_REG_IRQ)
 #endif
-
 			schedule_delayed_work(&pdata->check_status,
 				msecs_to_jiffies(interval));
 			break;
@@ -177,7 +173,7 @@ static int fb_event_callback(struct notifier_block *self,
 				cancel_work_sync(&pdata->check_status.work);
 			else
 #endif
-			cancel_delayed_work(&pdata->check_status);
+				cancel_delayed_work(&pdata->check_status);
 			break;
 		default:
 			pr_err("Unknown case in FB_EVENT_BLANK event\n");

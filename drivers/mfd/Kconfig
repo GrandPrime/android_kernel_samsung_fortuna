@@ -18,7 +18,6 @@ config MFD_SM5701
 	help
 	  If you say yes to this option, support will be included for the
 	  SM5701 I/F PMIC chip.
-
 config MFD_RT5033
 	tristate "Support for Richtek RT5033 I/F PMIC"
 	depends on I2C
@@ -354,18 +353,6 @@ config MFD_MAX77693
 	  additional drivers must be enabled in order to use the functionality
 	  of the device.
 
-config MFD_MAX77843
-	bool "Maxim Semiconductor MAX77843 PMIC Support"
-	depends on I2C=y
-	select MFD_CORE
-	help
-	  Say yes here to support for Maxim Semiconductor MAX77843.
-	  This is a companion Power Management IC with Flash, Haptic, Charger,
-	  and MUIC(Micro USB Interface Controller) controls on chip.
-	  This driver provides common support for accessing the device;
-	  additional drivers must be enabled in order to use the functionality
-	  of the device.
-
 config MFD_MAX8907
 	tristate "Maxim Semiconductor MAX8907 PMIC Support"
 	select MFD_CORE
@@ -411,17 +398,6 @@ config MFD_MAX8998
 	  This driver provides common support for accessing the device,
 	  additional drivers must be enabled in order to use the functionality
 	  of the device.
-
-config MFD_MAX77849
-	bool "Maxim Semiconductor MAX77849 PMIC Support"
-	depends on I2C=y
-	select MFD_CORE
-	help
-	  Say yes here to support for Maxim Semiconductor MAX77849.
-	  This is a Power Management IC with RTC, Flash, Fuel Gauge, Haptic,
-	  MUIC controls on chip.
-	  This driver provides common support for accessing the device;
-	  additional drivers
 
 config EZX_PCAP
 	bool "Motorola EZXPCAP Support"
@@ -555,16 +531,6 @@ config MFD_SEC_CORE
 	select MFD_CORE
 	select REGMAP_I2C
 	select REGMAP_IRQ
-	help
-	 Support for the Samsung Electronics MFD series.
-	 This driver provides common support for accessing the device,
-	 additional drivers must be enabled in order to use the functionality
-	 of the device
-
-config MFD_S2MU003
-	bool "SAMSUNG Electronics IF PMIC Series Support"
-	depends on I2C=y
-	select MFD_CORE
 	help
 	 Support for the Samsung Electronics MFD series.
 	 This driver provides common support for accessing the device,
@@ -1029,6 +995,14 @@ config MFD_LM3533
 	  additional drivers must be enabled in order to use the LED,
 	  backlight or ambient-light-sensor functionality of the device.
 
+config MFD_LM3632
+	tristate "TI LM3632 Lighting BL IC"
+	depends on I2C
+	select MFD_CORE
+	select REGMAP_I2C
+	help
+	  Say yes here to enable support for TI LM3632 BL IC.
+
 config MFD_TIMBERDALE
 	tristate "Timberdale FPGA"
 	select MFD_CORE
@@ -1121,24 +1095,11 @@ config MFD_WM5102
 	help
 	  Support for Wolfson Microelectronics WM5102 low power audio SoC
 
-config MFD_FLORIDA
-	bool "Wolfson Microelectronics Florida class codecs"
+config MFD_WM5110
+	bool "Wolfson Microelectronics WM5110"
 	depends on MFD_ARIZONA
 	help
-	  Support for Wolfson Microelectronics Florida class low power audio SoC
-	  such as the WM8280
-
-config MFD_VEGAS
-	bool "Support Wolfson Microelectronics Vegas"
-	depends on MFD_ARIZONA
-	help
-	  Support for Wolfson Microelectronics Vegas low power audio SoC
-
-config MFD_WM8997
-	bool "Wolfson Microelectronics WM8997"
-	depends on MFD_ARIZONA
-	help
-	  Support for Wolfson Microelectronics WM8997 low power audio SoC
+	  Support for Wolfson Microelectronics WM5110 low power audio SoC
 
 config MFD_WM8400
 	bool "Wolfson Microelectronics WM8400"
@@ -1248,6 +1209,17 @@ config WCD9306_CODEC
 	  read/write capability to registers which are part of the
 	  WCD9306 core and gives the ability to use the WCD9306 codec.
 	  The WCD9306 codec supports either I2C/I2S or Slimbus for
+	  control and data exchnage with master processor.
+
+config WCD9330_CODEC
+	tristate "WCD9330 Codec"
+	select SLIMBUS
+	select MFD_CORE
+	help
+	  Enables the WCD9xxx codec core driver. The core driver provides
+	  read/write capability to registers which are part of the
+	  WCD9330 core and gives the ability to use the WCD9330 codec.
+	  The WCD9330 codec support either I2C/I2S or Slimbus for
 	  control and data exchnage with master processor.
 
 endmenu

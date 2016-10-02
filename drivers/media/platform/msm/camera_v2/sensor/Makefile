@@ -20,4 +20,3 @@ obj-$(CONFIG_SP1628) += sp1628.o
 obj-$(CONFIG_GC0339) += gc0339.o
 
 obj-$(CONFIG_SR200PC20) += sr200pc20_yuv.o
-obj-$(CONFIG_S5K4ECGX) += s5k4ecgx_yuv.o

@@ -33,51 +33,50 @@
 #include <linux/atomic.h>
 #include <media/radio-iris-commands.h>
 
-const unsigned char MIN_TX_TONE_VAL = 0x00;
-const unsigned char MAX_TX_TONE_VAL = 0x07;
-const unsigned char MIN_HARD_MUTE_VAL = 0x00;
-const unsigned char MAX_HARD_MUTE_VAL = 0x03;
-const unsigned char MIN_SRCH_MODE = 0x00;
-const unsigned char MAX_SRCH_MODE = 0x09;
-const unsigned char MIN_SCAN_DWELL = 0x00;
-const unsigned char MAX_SCAN_DWELL = 0x0F;
-const unsigned char MIN_SIG_TH = 0x00;
-const unsigned char MAX_SIG_TH = 0x03;
-const unsigned char MIN_PTY = 0X00;
-const unsigned char MAX_PTY = 0x1F;
-const unsigned short MIN_PI = 0x0000;
-const unsigned short MAX_PI = 0xFFFF;
-const unsigned char MIN_SRCH_STATIONS_CNT = 0x00;
-const unsigned char MAX_SRCH_STATIONS_CNT = 0x14;
-const unsigned char MIN_CHAN_SPACING = 0x00;
-const unsigned char MAX_CHAN_SPACING = 0x02;
-const unsigned char MIN_EMPHASIS = 0x00;
-const unsigned char MAX_EMPHASIS = 0x01;
-const unsigned char MIN_RDS_STD = 0x00;
-const unsigned char MAX_RDS_STD = 0x02;
-const unsigned char MIN_ANTENNA_VAL = 0x00;
-const unsigned char MAX_ANTENNA_VAL = 0x01;
-const unsigned char MIN_TX_PS_REPEAT_CNT = 0x01;
-const unsigned char MAX_TX_PS_REPEAT_CNT = 0x0F;
-const unsigned char MIN_SOFT_MUTE = 0x00;
-const unsigned char MAX_SOFT_MUTE = 0x01;
-const unsigned char MIN_PEEK_ACCESS_LEN = 0x01;
-const unsigned char MAX_PEEK_ACCESS_LEN = 0xF9;
-const unsigned char MIN_RESET_CNTR = 0x00;
-const unsigned char MAX_RESET_CNTR = 0x01;
-const unsigned char MIN_HLSI = 0x00;
-const unsigned char MAX_HLSI = 0x02;
-const unsigned char MIN_NOTCH_FILTER = 0x00;
-const unsigned char MAX_NOTCH_FILTER = 0x02;
-const unsigned char MIN_INTF_DET_OUT_LW_TH = 0x00;
-const unsigned char MAX_INTF_DET_OUT_LW_TH = 0xFF;
-const unsigned char MIN_INTF_DET_OUT_HG_TH = 0x00;
-const unsigned char MAX_INTF_DET_OUT_HG_TH = 0xFF;
-const signed char MIN_SINR_TH = -128;
-const signed char MAX_SINR_TH = 127;
-const unsigned char MIN_SINR_SAMPLES = 0x01;
-const unsigned char MAX_SINR_SAMPLES = 0xFF;
-
+#define MIN_TX_TONE_VAL 0x00
+#define MAX_TX_TONE_VAL 0x07
+#define MIN_HARD_MUTE_VAL 0x00
+#define MAX_HARD_MUTE_VAL 0x03
+#define MIN_SRCH_MODE 0x00
+#define MAX_SRCH_MODE 0x09
+#define MIN_SCAN_DWELL 0x00
+#define MAX_SCAN_DWELL 0x0F
+#define MIN_SIG_TH 0x00
+#define MAX_SIG_TH 0x03
+#define MIN_PTY 0X00
+#define MAX_PTY 0x1F
+#define MIN_PI 0x0000
+#define MAX_PI 0xFFFF
+#define MIN_SRCH_STATIONS_CNT 0x00
+#define MAX_SRCH_STATIONS_CNT 0x14
+#define MIN_CHAN_SPACING 0x00
+#define MAX_CHAN_SPACING 0x02
+#define MIN_EMPHASIS 0x00
+#define MAX_EMPHASIS 0x01
+#define MIN_RDS_STD 0x00
+#define MAX_RDS_STD 0x02
+#define MIN_ANTENNA_VAL 0x00
+#define MAX_ANTENNA_VAL 0x01
+#define MIN_TX_PS_REPEAT_CNT 0x01
+#define MAX_TX_PS_REPEAT_CNT 0x0F
+#define MIN_SOFT_MUTE 0x00
+#define MAX_SOFT_MUTE 0x01
+#define MIN_PEEK_ACCESS_LEN 0x01
+#define MAX_PEEK_ACCESS_LEN 0xF9
+#define MIN_RESET_CNTR 0x00
+#define MAX_RESET_CNTR 0x01
+#define MIN_HLSI 0x00
+#define MAX_HLSI 0x02
+#define MIN_NOTCH_FILTER 0x00
+#define MAX_NOTCH_FILTER 0x02
+#define MIN_INTF_DET_OUT_LW_TH 0x00
+#define MAX_INTF_DET_OUT_LW_TH 0xFF
+#define MIN_INTF_DET_OUT_HG_TH 0x00
+#define MAX_INTF_DET_OUT_HG_TH 0xFF
+#define MIN_SINR_TH -128
+#define MAX_SINR_TH 127
+#define MIN_SINR_SAMPLES 0x01
+#define MAX_SINR_SAMPLES 0xFF
 
 /* ---- HCI Packet structures ---- */
 #define RADIO_HCI_COMMAND_HDR_SIZE sizeof(struct radio_hci_command_hdr)
@@ -133,11 +132,6 @@ const unsigned char MAX_SINR_SAMPLES = 0xFF;
 #define RADIO_HCI_TIMEOUT	(10000)	/* 10 seconds */
 
 #define TUNE_PARAM 16
-#define AF_JMP_TUNE 0x03
-#define DIG_AUDIO_0_MODE	0x2B
-#define DIG_AUDIO_0_LEN		0x10
-#define SMUTE_TH_OFFSET		2
-#define MAX_SOFTMUTE_TH		127
 struct radio_hci_command_hdr {
 	__le16	opcode;		/* OCF & OGF */
 	__u8	plen;
@@ -413,7 +407,7 @@ struct hci_fm_ssbi_peek {
 } __packed;
 
 struct hci_fm_ch_det_threshold {
-	signed char sinr;
+	char sinr;
 	__u8 sinr_samples;
 	__u8 low_th;
 	__u8 high_th;
@@ -451,13 +445,10 @@ struct hci_fm_ch_det_threshold {
 
 #define RDSGRP_DATA_OFFSET	 0x1
 
-#define RDS_GRPS_ALL 0xFFFFFFFF
 /*RT PLUS*/
 #define DUMMY_CLASS		0
 #define RT_PLUS_LEN_1_TAG	3
 #define RT_ERT_FLAG_BIT		5
-#define ITEM_TOGGLE_BIT     4
-#define ITEM_RUNNING_BIT    3
 
 /*TAG1*/
 #define TAG1_MSB_OFFSET		3
@@ -501,7 +492,7 @@ struct hci_ev_tune_status {
 	__u8    sub_event;
 	__le32  station_freq;
 	__u8    serv_avble;
-	__u8    rssi;
+	char    rssi;
 	__u8    stereo_prg;
 	__u8    rds_sync_status;
 	__u8    mute_mode;
@@ -674,11 +665,6 @@ struct hci_fm_spur_data {
 #define RDS_PS_DATA_OFFSET 8
 #define RDS_CONFIG_OFFSET  3
 #define RDS_AF_JUMP_OFFSET 4
-#define RDS_RT_OFFSET 0
-#define RDS_PS_ALL_OFFSET 1
-#define RDS_PS_SIMPLE_OFFSET 2
-#define RDS_AF_LIST_OFFSET 3
-#define RDS_GRP_3A 6
 #define PI_CODE_OFFSET 4
 #define AF_SIZE_OFFSET 6
 #define AF_LIST_OFFSET 7

@@ -28,6 +28,5 @@
 
 #define THROTTLE_ON	0
 #define THROTTLE_OFF	1
-#define THROTTLE_OVERRIDE_OFF 2
 
 #endif

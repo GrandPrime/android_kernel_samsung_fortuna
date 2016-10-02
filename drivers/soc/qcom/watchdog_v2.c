@@ -311,7 +311,6 @@ static void pet_watchdog(struct msm_watchdog_data *wdog_dd)
 	last_pet = time_ns;
 	sec_debug_save_last_pet(time_ns);
 #endif
-
 }
 
 static void keep_alive_response(void *info)
@@ -536,6 +535,7 @@ static void configure_bark_dump(struct msm_watchdog_data *wdog_dd)
 			pr_err("cpu reg context space allocation failed\n");
 			goto out1;
 		}
+
 #ifdef CONFIG_SEC_DEBUG
 		cpu_buf_vaddr=(unsigned int)cpu_buf;
 		cpu_buf_paddr=(unsigned int)virt_to_phys(cpu_buf);
@@ -545,8 +545,8 @@ static void configure_bark_dump(struct msm_watchdog_data *wdog_dd)
 							cpu * MAX_CPU_CTX_SIZE);
 #ifdef CONFIG_SEC_DEBUG
 			pr_info("WDOG_V2 handled by TZ: for cpu[%d] @0x%08x PA:%08x\n",
-				 cpu,(unsigned int) cpu_data[cpu].addr,
-				(unsigned int)(cpu_buf + cpu * MAX_CPU_CTX_SIZE));
+					cpu,(unsigned int) cpu_data[cpu].addr,
+					(unsigned int)(cpu_buf + cpu * MAX_CPU_CTX_SIZE));
 #endif
 			cpu_data[cpu].len = MAX_CPU_CTX_SIZE;
 			dump_entry.id = MSM_DUMP_DATA_CPU_CTX + cpu;
@@ -786,7 +786,6 @@ static int init_watchdog(void)
 	return platform_driver_register(&msm_watchdog_driver);
 }
 
-EXPORT_COMPAT("qcom,msm-watchdog");
 pure_initcall(init_watchdog);
 MODULE_DESCRIPTION("MSM Watchdog Driver");
 MODULE_LICENSE("GPL v2");
